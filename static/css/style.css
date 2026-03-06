@@ -1,0 +1,282 @@
+/* 自定义CSS样式 */
+
+/* 全局样式 */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+/* 卡片样式增强 */
+.card {
+    border: none;
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+    font-weight: 600;
+    padding: 10px 15px;
+}
+
+/* 按钮样式 */
+.btn {
+    border-radius: 5px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    padding: 10px 20px;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 表格样式 */
+.table {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border-radius: 5px;
+}
+
+.table thead th {
+    background-color: #f2f2f2;
+    color: #333;
+    font-weight: 600;
+}
+
+/* 图表容器 */
+.feature-chart, #quality-chart, #model-comparison-chart {
+    border-radius: 5px;
+    background-color: white;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* 页面标题 */
+h2 {
+    color: #2c3e50;
+    font-weight: 700;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+}
+
+/* 表单样式 */
+.form-control, .form-select {
+    border-radius: 5px;
+    padding: 12px 15px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #4a6fa5;
+    box-shadow: 0 0 0 0.25rem rgba(74, 111, 165, 0.25);
+}
+
+/* 操作提示 */
+.form-text {
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin-top: 5px;
+}
+
+/* 列表项样式 */
+.list-group-item {
+    border-left: none;
+    border-right: none;
+    padding: 15px;
+    transition: all 0.2s ease;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.list-group-item i {
+    width: 25px;
+    text-align: center;
+    font-size: 1.2rem;
+}
+
+/* 预测结果样式 */
+.display-1 i {
+    font-size: 5rem;
+}
+
+/* 自定义表格样式 */
+.table-responsive {
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+/* 适应不同尺寸屏幕 */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 15px;
+    }
+    
+    .row {
+        margin-right: -10px;
+        margin-left: -10px;
+    }
+    
+    .col-md-6, .col-md-12 {
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+}
+
+/* AI报告内部容器样式 */
+.ai-report-inner-container {
+  padding-top: 0;
+  padding-bottom: 10px;
+}
+
+/* AI报告相关样式 */
+.ai-report {
+  padding-top: 0;
+  margin-top: 0;
+  line-height: 1.4;
+}
+
+#ai-report {
+  padding-top: 0;
+}
+
+.ai-report-content {
+  padding: 5px 15px;
+  flex-grow: 1;
+  overflow-y: auto;
+  margin-top: 0; /* 减少顶部边距 */
+  padding-bottom: 80px; /* 底部增加空间，方便滚动 */
+}
+
+/* 思考内容折叠区域 */
+.ai-thinking-section {
+  margin: 0 0 10px 0;
+  border: 1px solid #e9ecef;
+  border-radius: 5px;
+  overflow: hidden;
+  display: block;
+}
+
+.ai-thinking-header {
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: #6c757d;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.ai-thinking-content {
+  padding: 10px;
+  background-color: #f8f9fa;
+  font-size: 14px;
+  color: #6c757d;
+  display: none; /* 默认折叠 */
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* 流式输出样式 */
+.streaming-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cursor-blink {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  background-color: #4a6fa5;
+  margin-left: 2px;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 报告中的标题样式 */
+.ai-report h1,
+.ai-report h2,
+.ai-report h3 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  color: #4a6fa5;
+}
+
+.ai-report h1 {
+  font-size: 22px;
+}
+
+.ai-report h2 {
+  font-size: 20px;
+  margin-top: 5px;
+  margin-bottom: 10px;
+}
+
+.ai-report h3 {
+  font-size: 18px;
+}
+
+/* 报告段落样式 */
+.ai-report p {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+/* 报告列表样式 */
+.ai-report ul,
+.ai-report ol {
+  margin-top: 5px;
+  margin-bottom: 10px;
+  padding-left: 20px;
+}
+
+.ai-report li {
+  margin-bottom: 5px;
+}
+
+/* 减少空白空间 */
+.card-body {
+  padding: 10px 15px;
+}
+
+/* 删除底部边界 */
+.ai-report-section .card {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.ai-report-content {
+  border-bottom: none;
+  padding-bottom: 100px; /* 增加底部内边距，确保内容不会被遮挡 */
+}
+
+/* 确保警告框正确显示 */
+.alert {
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border-radius: 5px;
+}
+
+.alert-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+} 

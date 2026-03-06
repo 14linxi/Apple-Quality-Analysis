@@ -1,0 +1,1343 @@
+{% extends "base.html" %}
+
+{% block title %}数据浏览 - 苹果品质分析系统{% endblock %}
+
+{% block head %}
+<style>
+    .change-highlight {
+        background-color: #fff3cd !important;
+        animation: fadeHighlight 3s ease-out;
+        border-left: 4px solid #ffc107 !important;
+    }
+    @keyframes fadeHighlight {
+        0% {
+            background-color: #d4edda;
+            border-left-color: #28a745;
+        }
+        100% {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+        }
+    }
+
+    .cell-update {
+        background-color: #ffeaa7 !important;
+        transition: background-color 1s ease-out;
+    }
+
+    .row-fade-out {
+        opacity: 0;
+        transition: opacity 0.5s ease-out;
+    }
+
+    .row-fade-in {
+        opacity: 1;
+        transition: opacity 0.5s ease-in;
+    }
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    .toast-container {
+        z-index: 1055;
+    }
+    .gap-2 {
+        gap: 0.5rem;
+    }
+
+    /* 新记录样式 */
+    .new-record {
+        background-color: #d1ecf1 !important;
+        border: 2px solid #17a2b8 !important;
+    }
+
+    /* 字段更新动画 */
+    .field-updated {
+        animation: fieldPulse 0.6s ease-in-out;
+    }
+
+    @keyframes fieldPulse {
+        0% { transform: scale(1); box-shadow: none; }
+        50% { transform: scale(1.05); box-shadow: 0 0 10px rgba(40, 167, 69, 0.5); }
+        100% { transform: scale(1); box-shadow: none; }
+    }
+
+    /* 精准字段高亮 */
+    .precise-highlight {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .precise-highlight::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(40, 167, 69, 0.3), transparent);
+        animation: shimmer 0.8s ease-in-out;
+    }
+
+    @keyframes shimmer {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+
+    /* 实时状态指示器 */
+    .realtime-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #28a745;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+        margin-right: 5px;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+
+    /* 数据变化统计 */
+    .change-stats {
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-left: 10px;
+    }
+
+    /* 持久高亮样式 */
+    .field-updated-persistent {
+        background-color: #d4edda !important;
+        color: #155724 !important;
+        font-weight: bold !important;
+        border: 2px solid #28a745 !important;
+    }
+
+    .field-updated-light {
+        background-color: #fff3cd !important;
+        border: 1px solid #ffc107 !important;
+    }
+
+    .row-updated-persistent {
+        border: 2px solid #28a745 !important;
+    }
+
+    /* 清除高亮按钮样式 */
+    .clear-highlight-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1050;
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="fas fa-database"></i> 数据浏览</h2>
+            <div class="d-flex gap-2">
+                <!-- 数据管理按钮组 -->
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-success btn-sm" onclick="showAddModal()" title="新增数据">
+                        <i class="fas fa-plus"></i> 新增
+                    </button>
+                    <button type="button" class="btn btn-info btn-sm" onclick="showChangeHistory()" title="查看变化历史">
+                        <i class="fas fa-history"></i> 历史
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="toggleRealTimeUpdate()" title="开启/关闭实时更新" id="realTimeBtn">
+                        <i class="fas fa-broadcast-tower"></i> 实时更新
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearAllHighlights()" title="清除所有高亮" id="clearHighlightBtn" style="display: none;">
+                        <i class="fas fa-eraser"></i> 清除高亮
+                    </button>
+                </div>
+
+                <!-- 原有的刷新表单 -->
+                <form action="{{ url_for('data_page') }}" method="get" class="d-flex">
+                    <div class="input-group">
+                        <select name="limit" class="form-select" id="limit">
+                            <option value="all" {% if request.args.get('limit') == 'all' %}selected{% endif %}>不限制</option>
+                            <option value="10" {% if request.args.get('limit') == '10' %}selected{% endif %}>10条</option>
+                            <option value="20" {% if request.args.get('limit') == '20' %}selected{% endif %}>20条</option>
+                            <option value="50" {% if request.args.get('limit') == '50' or not request.args.get('limit') %}selected{% endif %}>50条</option>
+                            <option value="100" {% if request.args.get('limit') == '100' %}selected{% endif %}>100条</option>
+                            <option value="200" {% if request.args.get('limit') == '200' %}selected{% endif %}>200条</option>
+                            <option value="500" {% if request.args.get('limit') == '500' %}selected{% endif %}>500条</option>
+                            <option value="1000" {% if request.args.get('limit') == '1000' %}selected{% endif %}>1000条</option>
+                            <option value="custom" {% if request.args.get('limit') and request.args.get('limit') not in ['10', '20', '50', '100', '200', '500', '1000', 'all'] %}selected{% endif %}>自定义</option>
+                        </select>
+                        <input type="number" name="custom_limit" class="form-control" id="custom_limit" placeholder="自定义记录数" min="1"
+                               value="{% if request.args.get('limit') and request.args.get('limit') not in ['10', '20', '50', '100', '200', '500', '1000', 'all'] %}{{ request.args.get('limit') }}{% endif %}"
+                               data-initial-state="{% if request.args.get('limit') and request.args.get('limit') not in ['10', '20', '50', '100', '200', '500', '1000', 'all'] %}visible{% else %}hidden{% endif %}">
+                        <input type="hidden" name="page" value="1">
+                        <button type="submit" class="btn btn-primary">刷新</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <p class="text-muted">
+            <i class="fas fa-database text-primary"></i> 使用Spark从Hive数据库获取苹果品质数据，了解数据的特征及基本统计信息。
+            {% if request.args.get('limit') == 'all' %}
+            当前显示: 所有数据 (分页显示，每页10条)
+            {% else %}
+            当前显示: 最多 {{ request.args.get('limit', '50') }} 条数据 (分页显示，每页10条)
+            {% endif %}
+            <span class="text-info"><i class="fas fa-info-circle"></i> 提示：选择"不限制"可能会导致加载时间变长，请耐心等待</span>
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-table"></i> 数据样本</h4>
+            </div>
+            <div class="card-body table-responsive">
+                {% if sample is defined and sample %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-primary">
+                                <tr>
+                                    {% for column in columns %}
+                                    <th style="text-align: center;">{{ column }}</th>
+                                    {% endfor %}
+                                    <th style="text-align: center;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                {% for row in data %}
+                                <tr id="row-{{ row[0] }}">
+                                    {% for value in row %}
+                                    <td style="text-align: center;">{{ value }}</td>
+                                    {% endfor %}
+                                    <td style="text-align: center;">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-primary" onclick="editRecord({{ row[0] }})" title="编辑">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" onclick="deleteRecord({{ row[0] }})" title="删除">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分页控制（仅静态模式） -->
+                    {% if total_pages > 1 %}
+                    <nav aria-label="数据分页">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('data_page', limit=request.args.get('limit', '50'), page=current_page-1, custom_limit=request.args.get('custom_limit', '')) }}" aria-label="上一页">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+
+                            {% for page_num in range(1, total_pages + 1) %}
+                                {% if page_num == current_page %}
+                                <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                                {% elif page_num == 1 or page_num == total_pages or (page_num >= current_page - 2 and page_num <= current_page + 2) %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('data_page', limit=request.args.get('limit', '50'), page=page_num, custom_limit=request.args.get('custom_limit', '')) }}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                                {% elif page_num == current_page - 3 or page_num == current_page + 3 %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                {% endif %}
+                            {% endfor %}
+
+                            <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('data_page', limit=request.args.get('limit', '50'), page=current_page+1, custom_limit=request.args.get('custom_limit', '')) }}" aria-label="下一页">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                    <p class="text-center text-muted">当前第 {{ current_page }} 页，共 {{ total_pages }} 页，总计 {{ total_records }} 条记录</p>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 无法加载数据样本，请检查Hive连接。
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-chart-bar"></i> 数据统计信息</h4>
+            </div>
+            <div class="card-body table-responsive">
+                {% if stats %}
+                    {{ stats|safe }}
+                    <div class="mt-3 small">
+                        <h5 class="text-muted">统计字段说明：</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="list-unstyled">
+                                    <li><strong>count</strong>：计数 - 数据项的总数量</li>
+                                    <li><strong>mean</strong>：均值 - 所有数据的平均值</li>
+                                    <li><strong>std</strong>：标准差 - 表示数据的离散程度</li>
+                                    <li><strong>min</strong>：最小值 - 数据集中的最小值</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="list-unstyled">
+                                    <li><strong>25%</strong>：第一四分位数 - 25%的数据小于此值</li>
+                                    <li><strong>50%</strong>：中位数 - 50%的数据小于此值</li>
+                                    <li><strong>75%</strong>：第三四分位数 - 75%的数据小于此值</li>
+                                    <li><strong>max</strong>：最大值 - 数据集中的最大值</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 无法加载数据统计信息，请检查Hive连接。
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-exclamation-triangle"></i> 缺失值信息</h4>
+            </div>
+            <div class="card-body table-responsive">
+                {% if missing_values %}
+                    {{ missing_values|safe }}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 无法加载缺失值信息，请检查Hive连接。
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-info-circle"></i> 数据字段说明</h4>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-primary">
+                        <tr>
+                            <th width="15%" style="text-align: center;">字段名</th>
+                            <th width="60%" style="text-align: center;">描述</th>
+                            <th width="25%" style="text-align: center;">数据类型</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="text-align: center;">a_id</td>
+                            <td style="text-align: center;">苹果唯一标识符</td>
+                            <td style="text-align: center;">整数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">size</td>
+                            <td style="text-align: center;">苹果的大小</td>
+                            <td style="text-align: center;">浮点数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">weight</td>
+                            <td style="text-align: center;">苹果的重量</td>
+                            <td style="text-align: center;">浮点数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">sweetness</td>
+                            <td style="text-align: center;">苹果的甜度</td>
+                            <td style="text-align: center;">浮点数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">crunchiness</td>
+                            <td style="text-align: center;">苹果的脆度</td>
+                            <td style="text-align: center;">浮点数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">juiciness</td>
+                            <td style="text-align: center;">苹果的多汁程度</td>
+                            <td style="text-align: center;">浮点数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">ripeness</td>
+                            <td style="text-align: center;">苹果的成熟度</td>
+                            <td style="text-align: center;">浮点数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">acidity</td>
+                            <td style="text-align: center;">苹果的酸度</td>
+                            <td style="text-align: center;">浮点数</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;">quality</td>
+                            <td style="text-align: center;">苹果的品质评级（good/bad）</td>
+                            <td style="text-align: center;">字符串</td>
+                        
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card-footer bg-white text-center">
+            <a href="{{ url_for('visualization_page') }}" class="btn btn-primary">
+                <i class="fas fa-chart-pie me-2"></i> 查看数据可视化
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 新增/编辑模态框 -->
+<div class="modal fade" id="recordModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="recordModalTitle">新增记录</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="recordForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="size" step="0.01" required>
+                                <label for="size">大小</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="weight" step="0.01" required>
+                                <label for="weight">重量</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="sweetness" step="0.01" required>
+                                <label for="sweetness">甜度</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="crunchiness" step="0.01" required>
+                                <label for="crunchiness">脆度</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="juiciness" step="0.01" required>
+                                <label for="juiciness">多汁程度</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="ripeness" step="0.01" required>
+                                <label for="ripeness">成熟度</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="number" class="form-control" id="acidity" step="0.01" required>
+                                <label for="acidity">酸度</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <select class="form-select" id="quality" required>
+                                    <option value="">选择品质</option>
+                                    <option value="good">优质</option>
+                                    <option value="bad">劣质</option>
+                                </select>
+                                <label for="quality">品质</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveRecord()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 实时更新状态显示 -->
+<div class="alert alert-info" id="realTimeStatus" style="display: none;">
+    <span class="realtime-indicator"></span>
+    <i class="fas fa-broadcast-tower me-2"></i>
+    <span id="realTimeStatusText">实时更新已开启，检测到变化时将提示刷新页面</span>
+    <span class="change-stats" id="changeStats"></span>
+    <button type="button" class="btn-close" onclick="toggleRealTimeUpdate()"></button>
+</div>
+
+<!-- 变化历史模态框 -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">数据变化历史</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="changeHistoryContent" style="max-height: 400px; overflow-y: auto;">
+                    <!-- 变化历史将通过JavaScript动态加载 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-info" onclick="refreshChangeHistory()">刷新</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast 通知容器 -->
+<div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer">
+    <!-- Toast 通知将通过JavaScript动态添加 -->
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 全局变量
+    let editingRecordId = null;
+    let realTimeUpdateEnabled = false;
+    let updateCheckInterval = null;
+    let notifiedChanges = new Set(); // 记录已通知的变化，避免重复通知
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // 获取选择框和自定义输入框元素
+        const limitSelect = document.getElementById('limit');
+        const customLimitInput = document.getElementById('custom_limit');
+
+        if (limitSelect && customLimitInput) {
+            // 根据data属性设置初始显示状态
+            if (customLimitInput.dataset.initialState === 'visible') {
+                customLimitInput.style.display = 'block';
+            } else {
+                customLimitInput.style.display = 'none';
+            }
+
+            // 当选择框值变化时触发
+            limitSelect.addEventListener('change', function() {
+                // 如果选择的是"自定义"，显示自定义输入框
+                if (this.value === 'custom') {
+                    customLimitInput.style.display = 'block';
+                    customLimitInput.focus();
+                } else {
+                    customLimitInput.style.display = 'none';
+                    customLimitInput.value = ''; // 清空自定义输入值
+                }
+            });
+
+            // 表单提交前处理
+            document.querySelector('form').addEventListener('submit', function(e) {
+                // 如果选择的是"自定义"但没有输入值，阻止提交
+                if (limitSelect.value === 'custom' && !customLimitInput.value) {
+                    e.preventDefault();
+                    alert('请输入自定义记录数');
+                    customLimitInput.focus();
+                    return;
+                }
+
+                // 如果选择的不是"自定义"，就不需要自定义输入框的值
+                if (limitSelect.value !== 'custom') {
+                    customLimitInput.disabled = true;
+                }
+            });
+        }
+    });
+
+    // 显示新增模态框
+    function showAddModal() {
+        editingRecordId = null;
+        document.getElementById('recordModalTitle').textContent = '新增记录';
+        document.getElementById('recordForm').reset();
+        new bootstrap.Modal(document.getElementById('recordModal')).show();
+    }
+
+    // 编辑记录
+    function editRecord(recordId) {
+        editingRecordId = recordId;
+        document.getElementById('recordModalTitle').textContent = '编辑记录';
+
+        // 从页面获取当前数据
+        const row = document.getElementById(`row-${recordId}`);
+        if (row) {
+            const cells = row.querySelectorAll('td');
+
+            // 填充表单（从表格中获取当前值）
+            document.getElementById('size').value = cells[1].textContent;
+            document.getElementById('weight').value = cells[2].textContent;
+            document.getElementById('sweetness').value = cells[3].textContent;
+            document.getElementById('crunchiness').value = cells[4].textContent;
+            document.getElementById('juiciness').value = cells[5].textContent;
+            document.getElementById('ripeness').value = cells[6].textContent;
+            document.getElementById('acidity').value = cells[7].textContent;
+            document.getElementById('quality').value = cells[8].textContent;
+
+            new bootstrap.Modal(document.getElementById('recordModal')).show();
+        } else {
+            showToast('获取记录失败', 'error');
+        }
+    }
+
+    // 保存记录
+    function saveRecord() {
+        try {
+            const formData = {
+                size: parseFloat(document.getElementById('size').value),
+                weight: parseFloat(document.getElementById('weight').value),
+                sweetness: parseFloat(document.getElementById('sweetness').value),
+                crunchiness: parseFloat(document.getElementById('crunchiness').value),
+                juiciness: parseFloat(document.getElementById('juiciness').value),
+                ripeness: parseFloat(document.getElementById('ripeness').value),
+                acidity: parseFloat(document.getElementById('acidity').value),
+                quality: document.getElementById('quality').value
+            };
+
+            // 验证数据
+            for (const [key, value] of Object.entries(formData)) {
+                if (key !== 'quality' && (isNaN(value) || value === null || value === undefined)) {
+                    showToast(`${key} 字段值无效`, 'error');
+                    return;
+                }
+            }
+
+            if (!formData.quality) {
+                showToast('请选择品质', 'error');
+                return;
+            }
+
+            // 实际保存操作
+            const saveData = {
+                record_id: editingRecordId,
+                size: formData.size,
+                weight: formData.weight,
+                sweetness: formData.sweetness,
+                crunchiness: formData.crunchiness,
+                juiciness: formData.juiciness,
+                ripeness: formData.ripeness,
+                acidity: formData.acidity,
+                quality: formData.quality
+            };
+
+            fetch('/api/data/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(saveData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    // 不刷新页面，保持实时更新状态
+                    // 关闭模态框
+                    bootstrap.Modal.getInstance(document.getElementById('recordModal')).hide();
+
+                    // 如果是新增记录，按照正常逻辑添加到表格最后
+                    if (!editingRecordId && data.data) {
+                        const tableBody = document.getElementById('dataTableBody');
+                        const newRecord = data.data;
+
+                        // 创建新行并添加高亮
+                        const newRow = createRecordRow(newRecord);
+                        newRow.classList.add('change-highlight', 'new-record');
+
+                        // 添加到表格最后（符合正常的数据添加逻辑）
+                        tableBody.appendChild(newRow);
+
+                        // 立即高亮显示
+                        setTimeout(() => {
+                            newRow.style.backgroundColor = '#d1ecf1';
+                            newRow.style.border = '2px solid #bee5eb';
+                        }, 100);
+
+                        // 滚动到新添加的记录
+                        newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                        showToast(`新增记录已添加: ID ${newRecord.a_id}`, 'success');
+                    }
+
+                    // 如果是编辑模式，更新对应行
+                    if (editingRecordId && data.data) {
+                        const existingRow = document.getElementById(`row-${editingRecordId}`);
+                        if (existingRow) {
+                            updateRowData(existingRow, data.data);
+                            existingRow.classList.add('change-highlight');
+                            existingRow.style.backgroundColor = '#d4edda';
+                            existingRow.style.border = '2px solid #c3e6cb';
+                        }
+                    }
+
+                    // 清空编辑状态
+                    editingRecordId = null;
+                    document.getElementById('recordModalTitle').textContent = '新增记录';
+
+                    // 更新最后检查时间，确保实时更新能正确检测到这次变化
+                    localStorage.setItem('lastChangeCheckTime', new Date().toISOString());
+                } else {
+                    showToast('保存失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('保存失败:', error);
+                showToast('保存失败: ' + error.message, 'error');
+            });
+
+            bootstrap.Modal.getInstance(document.getElementById('recordModal')).hide();
+        } catch (error) {
+            console.error('保存记录时出错:', error);
+            showToast('保存失败: ' + error.message, 'error');
+        }
+    }
+
+
+
+    // 删除记录
+    function deleteRecord(recordId) {
+        if (!confirm('确定要删除这条记录吗？')) return;
+
+        fetch(`/api/data/delete/${recordId}`, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                // 不刷新页面，保持实时更新状态
+                // 从表格中移除对应的行
+                const row = document.getElementById(`row-${recordId}`);
+                if (row) {
+                    row.remove();
+                }
+
+                // 更新最后检查时间，确保实时更新能正确检测到这次变化
+                localStorage.setItem('lastChangeCheckTime', new Date().toISOString());
+            } else {
+                showToast('删除失败: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('删除失败:', error);
+            showToast('删除失败: ' + error.message, 'error');
+        });
+    }
+
+
+
+    // 切换实时更新功能
+    function toggleRealTimeUpdate() {
+        realTimeUpdateEnabled = !realTimeUpdateEnabled;
+
+        const btn = document.getElementById('realTimeBtn');
+        const status = document.getElementById('realTimeStatus');
+        const statusText = document.getElementById('realTimeStatusText');
+        const clearBtn = document.getElementById('clearHighlightBtn');
+
+        if (realTimeUpdateEnabled) {
+            // 开启实时更新
+            btn.innerHTML = '<i class="fas fa-broadcast-tower"></i> 关闭实时更新';
+            btn.className = 'btn btn-danger btn-sm';
+            status.style.display = 'block';
+            statusText.textContent = '实时更新已开启，检测到变化时将提示刷新页面';
+            clearBtn.style.display = 'inline-block'; // 显示清除高亮按钮
+
+            // 开始定期检查数据变化
+            startRealTimeUpdate();
+            showToast('实时更新已开启', 'success');
+        } else {
+            // 关闭实时更新
+            btn.innerHTML = '<i class="fas fa-broadcast-tower"></i> 实时更新';
+            btn.className = 'btn btn-warning btn-sm';
+            status.style.display = 'none';
+            clearBtn.style.display = 'none'; // 隐藏清除高亮按钮
+
+            // 停止检查
+            stopRealTimeUpdate();
+            showToast('实时更新已关闭', 'info');
+        }
+    }
+
+    // 开始实时更新
+    function startRealTimeUpdate() {
+        if (updateCheckInterval) {
+            clearInterval(updateCheckInterval);
+        }
+
+        // 每3秒检查一次变化历史
+        updateCheckInterval = setInterval(() => {
+            checkForDataChanges();
+        }, 3000);
+    }
+
+    // 停止实时更新
+    function stopRealTimeUpdate() {
+        if (updateCheckInterval) {
+            clearInterval(updateCheckInterval);
+            updateCheckInterval = null;
+        }
+    }
+
+    // 检查数据变化（基于变化历史时间戳）
+    function checkForDataChanges() {
+        console.log('实时更新检查运行中...');
+
+        // 获取上次检查的时间戳
+        let lastCheckTime = localStorage.getItem('lastChangeCheckTime');
+        if (!lastCheckTime) {
+            // 如果没有上次检查时间，设置为当前时间
+            lastCheckTime = new Date().toISOString();
+            localStorage.setItem('lastChangeCheckTime', lastCheckTime);
+            console.log('首次检查，设置基准时间:', lastCheckTime);
+            return;
+        }
+
+        console.log('检查自', lastCheckTime, '以来的数据变化');
+
+        // 检查指定时间之后的变化
+        fetch(`/api/data/changes/recent?since=${encodeURIComponent(lastCheckTime)}&limit=20`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('变化检查响应:', data);
+
+            // 无论是否有变化，都更新最后检查时间，避免重复检测
+            const currentTime = new Date().toISOString();
+            localStorage.setItem('lastChangeCheckTime', currentTime);
+
+            if (data.success && data.data && data.data.length > 0) {
+                console.log(`检测到 ${data.data.length} 个数据变化`);
+
+                // 处理检测到的变化
+                processRecentChanges(data.data);
+
+                // 更新状态显示
+                updateStatusText(`检测到 ${data.data.length} 个数据变化`, data.data.length);
+
+            } else {
+                // 无变化，更新状态显示
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString();
+                const changeStats = document.getElementById('changeStats');
+                if (changeStats) {
+                    changeStats.textContent = `最后检查: ${timeStr}`;
+                    changeStats.style.display = 'inline';
+                }
+                console.log('无新变化');
+            }
+        })
+        .catch(error => {
+            console.error('检查数据变化失败:', error);
+            updateStatusText('数据变化检查失败');
+        });
+    }
+
+    // 刷新表格数据
+    function refreshTableData() {
+        // 不要完全刷新表格，只检查是否有真正的新记录
+        // 这里应该只添加真正新增的记录，而不是重新加载所有数据
+        console.log('检测到数据变化，但跳过完全刷新以避免重复显示');
+        showToast('检测到数据变化', 'info');
+    }
+
+    // 更新表格数据并保持高亮 - 已禁用以避免重复显示
+    function updateTableWithNewData(newData) {
+        // 此函数已禁用，因为会导致数据重复显示
+        // 实时更新现在只显示通知，不自动添加数据到表格
+        console.log('updateTableWithNewData 已禁用，避免重复显示数据');
+    }
+
+    // 处理最近的变化
+    function processRecentChanges(changes) {
+        if (!changes || changes.length === 0) {
+            return;
+        }
+
+        // 按时间排序，最新的变化最后处理
+        changes.sort((a, b) => new Date(a.change_time) - new Date(b.change_time));
+
+        console.log('处理变化:', changes);
+
+        // 获取已处理的变化ID列表，避免重复高亮
+        let processedChanges = JSON.parse(localStorage.getItem('processedChanges') || '[]');
+
+        changes.forEach(change => {
+            const recordId = change.record_id;
+            const operation = change.operation;
+            const changedFields = change.changed_fields || [];
+            const changeId = change.change_id;
+
+            // 检查是否已经处理过这个变化
+            if (processedChanges.includes(changeId)) {
+                console.log(`变化 ${changeId} 已处理过，跳过高亮`);
+                return;
+            }
+
+            console.log(`处理新变化: ${operation} 记录 ${recordId}, 字段: ${changedFields.join(',')}`);
+
+            if (operation === 'insert') {
+                // 处理新增记录 - 获取完整记录数据
+                handleInsertChange(recordId);
+                showToast(`新增记录: ID ${recordId}`, 'success');
+            } else if (operation === 'update') {
+                // 处理更新记录 - 获取最新数据并高亮变化字段
+                handleUpdateChange(recordId, null, changedFields);
+                const fieldsText = changedFields.length > 0 ? ` (${changedFields.join(', ')})` : '';
+                showToast(`更新记录: ID ${recordId}${fieldsText}`, 'info');
+            } else if (operation === 'delete') {
+                // 处理删除记录
+                handleDeleteChange(recordId);
+                showToast(`删除记录: ID ${recordId}`, 'warning');
+            }
+
+            // 记录已处理的变化ID
+            processedChanges.push(changeId);
+        });
+
+        // 保存已处理的变化ID列表（只保留最近100个，避免localStorage过大）
+        if (processedChanges.length > 100) {
+            processedChanges = processedChanges.slice(-100);
+        }
+        localStorage.setItem('processedChanges', JSON.stringify(processedChanges));
+    }
+
+    // 处理新增记录
+    function handleInsertChange(recordId, recordData = null) {
+        const tableBody = document.getElementById('dataTableBody');
+
+        // 检查记录是否已存在
+        const existingRow = document.getElementById(`row-${recordId}`);
+        if (existingRow) {
+            console.log(`记录 ${recordId} 已存在，只添加高亮效果`);
+            // 如果记录已存在，添加新增高亮效果
+            existingRow.classList.add('change-highlight', 'new-record');
+            existingRow.style.backgroundColor = '#d1ecf1';
+            existingRow.style.border = '2px solid #17a2b8';
+            return;
+        }
+
+        // 获取完整记录数据
+        fetch(`/api/data/${recordId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    addNewRecordRow(data.data, tableBody);
+                } else {
+                    console.error('获取新增记录失败:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('获取新增记录数据失败:', error);
+            });
+    }
+
+    // 添加新记录行的辅助函数
+    function addNewRecordRow(record, tableBody) {
+        // 创建新行并添加到表格最后（符合正常逻辑）
+        const newRow = createRecordRow(record);
+        newRow.classList.add('change-highlight', 'new-record');
+
+        // 添加滑入动画
+        newRow.style.transform = 'translateY(20px)';
+        newRow.style.opacity = '0';
+
+        // 添加到表格最后
+        tableBody.appendChild(newRow);
+
+        // 触发动画
+        setTimeout(() => {
+            newRow.style.transition = 'all 0.5s ease';
+            newRow.style.transform = 'translateY(0)';
+            newRow.style.opacity = '1';
+        }, 10);
+
+        // 滚动到新添加的记录
+        setTimeout(() => {
+            newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+
+        // 显示通知（基于时间戳避免重复）
+        const changeKey = `insert-${record.a_id}-${Date.now()}`;
+        showToast(`新增记录: ID ${record.a_id}`, 'success');
+
+        // 高亮一直显示，不移除
+        // 注释掉原来的移除高亮代码
+        // setTimeout(() => {
+        //     newRow.classList.remove('change-highlight');
+        // }, 3000);
+    }
+
+    // 处理更新记录
+    function handleUpdateChange(recordId, recordData = null, changedFields = []) {
+        const existingRow = document.getElementById(`row-${recordId}`);
+
+        if (!existingRow) {
+            console.log(`记录 ${recordId} 不存在于当前页面，跳过更新处理`);
+            return;
+        }
+
+        // 获取最新的记录数据
+        fetch(`/api/data/${recordId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    // 使用精准更新，高亮变化的字段
+                    updateRowDataPrecise(existingRow, data.data, changedFields);
+
+                    // 给整行添加更新高亮
+                    existingRow.classList.add('change-highlight');
+                    existingRow.style.border = '2px solid #28a745';
+
+                    console.log(`记录 ${recordId} 更新完成，变化字段: ${changedFields.join(', ')}`);
+                } else {
+                    console.error('获取更新记录失败:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('获取更新记录数据失败:', error);
+            });
+    }
+
+    // 处理删除记录
+    function handleDeleteChange(recordId) {
+        const existingRow = document.getElementById(`row-${recordId}`);
+        if (existingRow) {
+            // 添加淡出效果
+            existingRow.classList.add('row-fade-out');
+
+            // 显示通知
+            showToast(`删除记录: ID ${recordId}`, 'warning');
+
+            // 0.5秒后移除行
+            setTimeout(() => {
+                existingRow.remove();
+            }, 500);
+        }
+    }
+
+
+
+    // 创建记录行HTML
+    function createRecordRow(record) {
+        const row = document.createElement('tr');
+        row.id = `row-${record.a_id}`;
+
+        // 按照表格列顺序创建单元格
+        const columns = ['a_id', 'size', 'weight', 'sweetness', 'crunchiness', 'juiciness', 'ripeness', 'acidity', 'quality'];
+
+        columns.forEach(col => {
+            const cell = document.createElement('td');
+            cell.style.textAlign = 'center';
+            cell.textContent = record[col];
+            row.appendChild(cell);
+        });
+
+        // 添加操作列
+        const actionCell = document.createElement('td');
+        actionCell.style.textAlign = 'center';
+        actionCell.innerHTML = `
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-primary" onclick="editRecord(${record.a_id})" title="编辑">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button type="button" class="btn btn-outline-danger" onclick="deleteRecord(${record.a_id})" title="删除">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        row.appendChild(actionCell);
+
+        return row;
+    }
+
+    // 精准更新行数据（只更新变化的字段）
+    function updateRowDataPrecise(row, record, changedFields = []) {
+        const cells = row.querySelectorAll('td');
+        const columns = ['a_id', 'size', 'weight', 'sweetness', 'crunchiness', 'juiciness', 'ripeness', 'acidity', 'quality'];
+        let hasChanges = false;
+
+        columns.forEach((col, index) => {
+            if (cells[index] && record.hasOwnProperty(col)) {
+                const oldValue = cells[index].textContent.trim();
+                const newValue = String(record[col]);
+
+                if (oldValue !== newValue) {
+                    hasChanges = true;
+
+                    // 检查是否是明确变化的字段
+                    const isExplicitChange = changedFields.length === 0 || changedFields.includes(col);
+
+                    // 更新单元格内容
+                    cells[index].textContent = newValue;
+
+                    // 添加精准的高亮效果（持续显示，不闪烁）
+                    if (isExplicitChange) {
+                        // 明确变化的字段使用强高亮，持续显示
+                        cells[index].style.transition = 'all 0.4s ease';
+                        cells[index].style.backgroundColor = '#d4edda';
+                        cells[index].style.color = '#155724';
+                        cells[index].style.fontWeight = 'bold';
+                        cells[index].style.border = '2px solid #28a745';
+
+                        // 添加持久的高亮类
+                        cells[index].classList.add('field-updated-persistent');
+                    } else {
+                        // 其他变化使用轻微高亮，持续显示
+                        cells[index].style.transition = 'background-color 0.3s ease';
+                        cells[index].style.backgroundColor = '#fff3cd';
+                        cells[index].style.border = '1px solid #ffc107';
+
+                        // 添加持久的轻微高亮类
+                        cells[index].classList.add('field-updated-light');
+                    }
+                }
+            }
+        });
+
+        // 如果有变化，给整行添加持续的边框高亮
+        if (hasChanges) {
+            row.style.transition = 'border 0.3s ease';
+            row.style.border = '2px solid #28a745';
+            row.classList.add('row-updated-persistent');
+
+            // 不再移除边框高亮，保持持续显示
+            // setTimeout(() => {
+            //     row.style.border = '';
+            // }, 2000);
+        }
+    }
+
+    // 通用更新行数据（备用方案）
+    function updateRowData(row, record) {
+        updateRowDataPrecise(row, record, []);
+    }
+
+    // 更新状态文本和统计信息
+    function updateStatusText(message, changeCount = 0) {
+        const statusText = document.getElementById('realTimeStatusText');
+        const changeStats = document.getElementById('changeStats');
+
+        if (statusText) {
+            const originalText = statusText.textContent;
+            statusText.textContent = message;
+            statusText.style.fontWeight = 'bold';
+            statusText.style.color = '#28a745';
+
+            // 更新变化统计
+            if (changeStats && changeCount > 0) {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString();
+                changeStats.textContent = `最近检测: ${timeStr} | 变化数: ${changeCount}`;
+                changeStats.style.display = 'inline';
+            }
+
+            // 2秒后恢复原文本
+            setTimeout(() => {
+                statusText.textContent = originalText;
+                statusText.style.fontWeight = 'normal';
+                statusText.style.color = '';
+            }, 2000);
+        }
+    }
+
+
+
+    // 显示变化历史
+    function showChangeHistory() {
+        loadChangeHistory();
+        new bootstrap.Modal(document.getElementById('historyModal')).show();
+    }
+
+    // 加载变化历史
+    function loadChangeHistory() {
+        fetch('/api/data/changes?limit=20')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    renderChangeHistory(data.data);
+                } else {
+                    document.getElementById('changeHistoryContent').innerHTML =
+                        '<div class="alert alert-danger">加载变化历史失败: ' + data.error + '</div>';
+                }
+            })
+            .catch(error => {
+                console.error('加载变化历史失败:', error);
+                document.getElementById('changeHistoryContent').innerHTML =
+                    '<div class="alert alert-danger">加载变化历史失败: ' + error.message + '</div>';
+            });
+    }
+
+    // 渲染变化历史
+    function renderChangeHistory(changes) {
+        const container = document.getElementById('changeHistoryContent');
+
+        if (!changes || changes.length === 0) {
+            container.innerHTML = '<div class="alert alert-info">暂无变化历史</div>';
+            return;
+        }
+
+        let html = '<div class="list-group">';
+
+        changes.forEach(change => {
+            const operationIcon = {
+                'insert': '<i class="fas fa-plus text-success"></i>',
+                'update': '<i class="fas fa-edit text-info"></i>',
+                'delete': '<i class="fas fa-trash text-danger"></i>'
+            }[change.operation] || '<i class="fas fa-question text-secondary"></i>';
+
+            const operationText = {
+                'insert': '新增',
+                'update': '更新',
+                'delete': '删除'
+            }[change.operation] || '未知操作';
+
+            const userTriggered = change.user_triggered ? '用户操作' : '系统操作';
+
+            html += `
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">
+                            ${operationIcon} ${operationText} 记录 ID: ${change.record_id}
+                        </h6>
+                        <small class="text-muted">${change.change_time}</small>
+                    </div>
+                    <p class="mb-1">
+                        <span class="badge bg-secondary">${userTriggered}</span>
+                        ${change.changed_fields ? '<span class="badge bg-info ms-1">字段: ' + change.changed_fields + '</span>' : ''}
+                    </p>
+                    <small class="text-muted">变化ID: ${change.change_id}</small>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // 刷新变化历史
+    function refreshChangeHistory() {
+        loadChangeHistory();
+        showToast('变化历史已刷新', 'info');
+    }
+
+    // 显示Toast通知
+    function showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toastId = 'toast-' + Date.now();
+
+        const bgClass = {
+            'success': 'bg-success',
+            'error': 'bg-danger',
+            'warning': 'bg-warning',
+            'info': 'bg-info'
+        }[type] || 'bg-info';
+
+        const toastHtml = `
+            <div class="toast ${bgClass} text-white" id="${toastId}" role="alert">
+                <div class="toast-body">
+                    ${message}
+                    <button type="button" class="btn-close btn-close-white float-end" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        `;
+
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+        toast.show();
+
+        // 自动移除
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+    }
+
+    // 添加缺失的函数
+    function startKafkaProcessor() {
+        fetch('/api/kafka/start', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast('启动失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('启动失败: ' + error.message, 'error');
+            });
+    }
+
+    function stopKafkaProcessor() {
+        fetch('/api/kafka/stop', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'info');
+                } else {
+                    showToast('停止失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('停止失败: ' + error.message, 'error');
+            });
+    }
+
+    // 清除所有高亮效果
+    function clearAllHighlights() {
+        // 清除所有字段高亮
+        const highlightedCells = document.querySelectorAll('.field-updated-persistent, .field-updated-light');
+        highlightedCells.forEach(cell => {
+            cell.classList.remove('field-updated-persistent', 'field-updated-light');
+            cell.style.backgroundColor = '';
+            cell.style.color = '';
+            cell.style.fontWeight = '';
+            cell.style.border = '';
+        });
+
+        // 清除所有行高亮
+        const highlightedRows = document.querySelectorAll('.change-highlight, .new-record, .row-updated-persistent');
+        highlightedRows.forEach(row => {
+            row.classList.remove('change-highlight', 'new-record', 'row-updated-persistent');
+            row.style.border = '';
+            row.style.backgroundColor = '';
+        });
+
+        // 清除已处理的变化记录，允许重新高亮
+        localStorage.removeItem('processedChanges');
+        console.log('已清除所有高亮和变化记录');
+
+        // 重置最后检查时间，允许重新检测变化
+        localStorage.setItem('lastChangeCheckTime', new Date(Date.now() - 30000).toISOString());
+
+        showToast('已清除所有高亮效果', 'info');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+flask==2.2.3
+numpy==1.23.5
+pandas==1.5.3
+scikit-learn==1.2.2
+matplotlib==3.7.1
+seaborn==0.12.2
+pyhive==0.6.5
+thrift>=0.16.0
+plotly==5.14.1
+dash==2.9.3
+flask-wtf==1.1.1
+joblib==1.2.0
+stagewise-toolbar
+kafka-python==2.0.2
+pyspark==3.2.0 

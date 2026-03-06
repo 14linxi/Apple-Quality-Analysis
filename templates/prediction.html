@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}品质预测 - 苹果品质分析系统{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="fas fa-magic"></i> 苹果品质预测</h2>
+        <p class="text-muted">输入苹果的特征参数，使用训练好的机器学习模型预测苹果的品质。</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-7">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4><i class="fas fa-edit"></i> 输入特征参数</h4>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('prediction_page') }}" method="post">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="model" class="form-label">选择预测模型</label>
+                            <select class="form-control" id="model" name="model" required style="display: block; width: 100%; padding: 0.375rem 0.75rem; font-size: 1rem; font-weight: 400; line-height: 1.5; color: #212529; background-color: #fff; background-clip: padding-box; border: 1px solid #ced4da; border-radius: 0.25rem; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;"
+                                data-default-value="{{ selected_model }}">
+                                {% if model_choices %}
+                                    {% for model_id, model_name in model_choices %}
+                                    <option value="{{ model_id }}" {% if selected_model == model_id %}selected{% endif %}>{{ model_name }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="" disabled selected>无可用模型，请先训练模型</option>
+                                {% endif %}
+                            </select>
+                            <div class="form-text">选择用于预测的机器学习模型</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="size" class="form-label">大小</label>
+                            <input type="number" class="form-control" id="size" name="size" step="0.1" value="0" required>
+                            <div class="form-text">苹果的大小参数</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="weight" class="form-label">重量</label>
+                            <input type="number" class="form-control" id="weight" name="weight" step="0.1" value="0" required>
+                            <div class="form-text">苹果的重量参数</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="sweetness" class="form-label">甜度</label>
+                            <input type="number" class="form-control" id="sweetness" name="sweetness" step="0.1" value="0" required>
+                            <div class="form-text">苹果的甜度参数</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="crunchiness" class="form-label">脆度</label>
+                            <input type="number" class="form-control" id="crunchiness" name="crunchiness" step="0.1" value="0" required>
+                            <div class="form-text">苹果的脆度参数</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="juiciness" class="form-label">多汁程度</label>
+                            <input type="number" class="form-control" id="juiciness" name="juiciness" step="0.1" value="0" required>
+                            <div class="form-text">苹果的多汁程度参数</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="ripeness" class="form-label">成熟度</label>
+                            <input type="number" class="form-control" id="ripeness" name="ripeness" step="0.1" value="0" required>
+                            <div class="form-text">苹果的成熟度参数</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="acidity" class="form-label">酸度</label>
+                            <input type="number" class="form-control" id="acidity" name="acidity" step="0.1" value="0" required>
+                            <div class="form-text">苹果的酸度参数</div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" {% if not model_choices %}disabled{% endif %}>
+                            <i class="fas fa-magic me-2"></i> 预测品质
+                        </button>
+                        {% if not model_choices %}
+                        <div class="alert alert-warning mt-3">
+                            <i class="fas fa-exclamation-triangle me-2"></i> 请先在<a href="{{ url_for('modeling_page') }}">模型训练</a>页面训练模型
+                        </div>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        {% if prediction_result %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="fas fa-chart-pie"></i> 预测结果</h4>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="display-1 mb-3">
+                        {% if prediction_result == '优质' %}
+                            <i class="fas fa-check-circle text-success"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle text-danger"></i>
+                        {% endif %}
+                    </div>
+                    <h3>预测结果：{{ prediction_result }}</h3>
+                    <p class="lead">
+                        {% if prediction_result == '优质' %}
+                            此苹果被预测为优质水果
+                        {% else %}
+                            此苹果被预测为劣质水果
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> 预测结果基于您提供的特征参数和选择的模型。
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-lightbulb"></i> 特征说明</h4>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <div class="list-group-item d-flex">
+                        <i class="fas fa-ruler text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>大小</h5>
+                            <p class="mb-0">苹果的物理尺寸，常以直径表示</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex">
+                        <i class="fas fa-weight-hanging text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>重量</h5>
+                            <p class="mb-0">苹果的重量</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex">
+                        <i class="fas fa-cookie text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>甜度</h5>
+                            <p class="mb-0">苹果的甜度指标，正值表示甜，负值表示不甜</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex">
+                        <i class="fas fa-cookie-bite text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>脆度</h5>
+                            <p class="mb-0">苹果的脆度指标，正值表示脆，负值表示不脆</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex">
+                        <i class="fas fa-tint text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>多汁程度</h5>
+                            <p class="mb-0">苹果的多汁程度，正值表示多汁，负值表示干燥</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex">
+                        <i class="fas fa-calendar-alt text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>成熟度</h5>
+                            <p class="mb-0">苹果的成熟程度，正值表示成熟，负值表示未成熟</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex">
+                        <i class="fas fa-lemon text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>酸度</h5>
+                            <p class="mb-0">苹果的酸度指标，正值表示酸，负值表示不酸</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card-footer bg-white text-center">
+            <a href="{{ url_for('modeling_page') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-brain me-2"></i> 返回模型训练
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-home me-2"></i> 返回首页
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 直接设置模型选择下拉框的值
+        const modelSelect = document.getElementById('model');
+        const selectedModel = '{{ selected_model }}';
+        
+        if (modelSelect && selectedModel) {
+            // 直接设置值
+            modelSelect.value = selectedModel;
+            
+            // 如果直接设置不起作用，尝试使用 setTimeout 延迟设置
+            setTimeout(function() {
+                modelSelect.value = selectedModel;
+            }, 100);
+        }
+    });
+</script>
+{% endblock %} 

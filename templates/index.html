@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 苹果品质分析系统{% endblock %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-md-12 text-center">
+        <h1 class="display-4 mb-4">苹果品质分析系统</h1>
+        <p class="lead">基于机器学习和大数据技术的智能分析平台，集成数据采集、实时处理、可视化分析、模型训练和AI智能分析等功能</p>
+        <p class="text-muted">通过分析苹果的多种特征（大小、重量、甜度、脆度、多汁程度、成熟度和酸度），训练机器学习模型来预测苹果品质</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h4><i class="fas fa-chart-line"></i> 系统功能</h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex">
+                        <i class="fas fa-database text-primary me-3 mt-1"></i>
+                        <div>
+                            <h5>数据管理</h5>
+                            <p>基于Spark+Hive的大数据处理，支持数据浏览、增删改查、实时监控和批量操作。</p>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <i class="fas fa-stream text-info me-3 mt-1"></i>
+                        <div>
+                            <h5>实时数据处理</h5>
+                            <p>基于Kafka的实时数据流处理，自动检测数据变更并实时同步到前端界面。</p>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <i class="fas fa-chart-pie text-success me-3 mt-1"></i>
+                        <div>
+                            <h5>数据可视化</h5>
+                            <p>特征分布图、相关性热图、品质分布饼图、雷达图等多种交互式图表展示。</p>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <i class="fas fa-brain text-danger me-3 mt-1"></i>
+                        <div>
+                            <h5>机器学习</h5>
+                            <p>支持6种算法：高斯朴素贝叶斯、BP神经网络、逻辑回归、随机森林、KNN、装袋模型。</p>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <i class="fas fa-robot text-purple me-3 mt-1"></i>
+                        <div>
+                            <h5>AI智能分析</h5>
+                            <p>集成多种AI模型（OpenAI、Anthropic等），自动生成数据分析报告和智能建议。</p>
+                        </div>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <i class="fas fa-magic text-warning me-3 mt-1"></i>
+                        <div>
+                            <h5>品质预测</h5>
+                            <p>根据苹果特征（大小、重量、甜度等7个维度）智能预测品质等级。</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h4><i class="fas fa-lightbulb"></i> 快速开始</h4>
+            </div>
+            <div class="card-body">
+                <p class="mb-4">使用本系统分析苹果品质只需五个简单步骤：</p>
+                <div class="d-flex mb-3">
+                    <div class="me-3 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">1</div>
+                    <div>
+                        <h5>实时数据浏览</h5>
+                        <p>了解数据集特征，查看基本统计信息和实时数据变更监控</p>
+                        <a href="{{ url_for('data_page') }}" class="btn btn-outline-primary btn-sm">开始浏览 <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                </div>
+                <div class="d-flex mb-3">
+                    <div class="me-3 bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">2</div>
+                    <div>
+                        <h5>可视化与AI分析</h5>
+                        <p>通过交互式图表理解数据特征，结合AI智能分析生成深度报告</p>
+                        <a href="{{ url_for('visualization_page') }}" class="btn btn-outline-success btn-sm">查看分析 <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                </div>
+                <div class="d-flex mb-3">
+                    <div class="me-3 bg-danger text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">3</div>
+                    <div>
+                        <h5>训练模型</h5>
+                        <p>使用6种机器学习算法训练预测模型并比较性能</p>
+                        <a href="{{ url_for('modeling_page') }}" class="btn btn-outline-danger btn-sm">训练模型 <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                </div>
+                <div class="d-flex mb-3">
+                    <div class="me-3 bg-warning text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">4</div>
+                    <div>
+                        <h5>预测品质</h5>
+                        <p>输入苹果特征，使用训练好的模型预测品质等级</p>
+                        <a href="{{ url_for('prediction_page') }}" class="btn btn-outline-warning btn-sm">开始预测 <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                </div>
+                <div class="d-flex">
+                    <div class="me-3 bg-info text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">5</div>
+                    <div>
+                        <h5>AI智能分析</h5>
+                        <p>配置AI模型，生成智能数据分析报告和建议</p>
+                        <a href="{{ url_for('ai_settings_page') }}" class="btn btn-outline-info btn-sm">AI设置 <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-info-circle"></i> 关于本系统</h4>
+            </div>
+            <div class="card-body">
+                <p>本系统是一个基于机器学习和大数据技术的智能分析平台，采用完整的大数据技术栈：<strong>Spark + Kafka + Hive + HDFS</strong>，集成多种AI模型，为苹果品质分析提供全面的解决方案。</p>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-cogs text-primary"></i> 核心技术栈</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success"></i> <strong>大数据处理</strong>：Apache Spark, PySpark</li>
+                            <li><i class="fas fa-check text-success"></i> <strong>实时流处理</strong>：Apache Kafka</li>
+                            <li><i class="fas fa-check text-success"></i> <strong>数据存储</strong>：Apache Hive, HDFS</li>
+                            <li><i class="fas fa-check text-success"></i> <strong>机器学习</strong>：Scikit-learn, Pandas</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-robot text-info"></i> AI集成能力</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success"></i> <strong>多平台支持</strong>：OpenAI, Anthropic, Google AI</li>
+                            <li><i class="fas fa-check text-success"></i> <strong>智能报告</strong>：自动生成数据分析报告</li>
+                            <li><i class="fas fa-check text-success"></i> <strong>流式输出</strong>：实时生成和显示内容</li>
+                            <li><i class="fas fa-check text-success"></i> <strong>历史管理</strong>：报告保存和历史记录</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="mb-4">系统支持6种机器学习算法，提供全面的模型性能对比分析：</p>
+                <div class="row text-center mt-4">
+                    <div class="col-md-4 col-sm-6 mb-4">
+                        <div class="p-3 bg-light rounded">
+                            <i class="fas fa-chart-bar text-primary" style="font-size: 2rem;"></i>
+                            <h5 class="mt-3">高斯朴素贝叶斯</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-sm-6 mb-4">
+                        <div class="p-3 bg-light rounded">
+                            <i class="fas fa-network-wired text-success" style="font-size: 2rem;"></i>
+                            <h5 class="mt-3">BP神经网络</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-sm-6 mb-4">
+                        <div class="p-3 bg-light rounded">
+                            <i class="fas fa-chart-line text-danger" style="font-size: 2rem;"></i>
+                            <h5 class="mt-3">逻辑回归</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-sm-6 mb-4">
+                        <div class="p-3 bg-light rounded">
+                            <i class="fas fa-tree text-success" style="font-size: 2rem;"></i>
+                            <h5 class="mt-3">随机森林</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-sm-6 mb-4">
+                        <div class="p-3 bg-light rounded">
+                            <i class="fas fa-project-diagram text-primary" style="font-size: 2rem;"></i>
+                            <h5 class="mt-3">K最近邻(KNN)</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-sm-6 mb-4">
+                        <div class="p-3 bg-light rounded">
+                            <i class="fas fa-layer-group text-warning" style="font-size: 2rem;"></i>
+                            <h5 class="mt-3">装袋模型</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-center">
+                <a href="{{ url_for('modeling_page') }}" class="btn btn-primary me-2">
+                    <i class="fas fa-brain me-2"></i> 开始训练模型
+                </a>
+                <a href="{{ url_for('ai_settings_page') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-robot me-2"></i> AI智能分析
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

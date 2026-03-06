@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}模型训练 - 苹果品质分析系统{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="fas fa-brain"></i> 模型训练</h2>
+        <p class="text-muted">使用多种机器学习算法训练苹果品质预测模型，并评估各模型的性能。</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-cogs"></i> 训练参数设置</h4>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('modeling_page') }}" method="post">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="test_size" class="form-label">测试集比例 (0.1-0.5)</label>
+                                <input type="number" class="form-control" id="test_size" name="test_size" min="0.1" max="0.5" step="0.05" value="{{ test_size }}">
+                                <div class="form-text">测试集占总数据集的比例，通常设置在0.1到0.5之间</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="random_state" class="form-label">随机种子 (0-100)</label>
+                                <input type="number" class="form-control" id="random_state" name="random_state" min="0" max="100" step="1" value="{{ random_state }}">
+                                <div class="form-text">设置随机种子以确保结果的可重复性</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-play me-2"></i> 开始训练模型
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if model_comparison_chart %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-chart-bar"></i> 模型性能对比</h4>
+            </div>
+            <div class="card-body">
+                <div id="model-comparison-chart" style="height: 500px;"></div>
+                <div class="mt-3">
+                    <p class="text-muted">条形图展示了不同机器学习模型在测试集上的准确率对比。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if results %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-table"></i> 模型评估结果</h4>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="modelAccordion">
+                    {% for model_name, model_result in results.items() %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading-{{ model_name }}">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ model_name }}" aria-expanded="{{ 'true' if loop.first else 'false' }}" aria-controls="collapse-{{ model_name }}">
+                                {% if model_name == 'naive_bayes' %}
+                                    <i class="fas fa-chart-bar me-2"></i> 高斯朴素贝叶斯
+                                {% elif model_name == 'neural_network' %}
+                                    <i class="fas fa-network-wired me-2"></i> BP神经网络
+                                {% elif model_name == 'logistic_regression' %}
+                                    <i class="fas fa-chart-line me-2"></i> 逻辑回归模型
+                                {% elif model_name == 'random_forest' %}
+                                    <i class="fas fa-tree me-2"></i> 随机森林
+                                {% elif model_name == 'knn' %}
+                                    <i class="fas fa-project-diagram me-2"></i> K最近邻(KNN)
+                                {% elif model_name == 'bagging' %}
+                                    <i class="fas fa-layer-group me-2"></i> 装袋模型
+                                {% else %}
+                                    <i class="fas fa-cogs me-2"></i> {{ model_name }}
+                                {% endif %}
+                                <span class="ms-2">准确率: {{ "%.2f"|format(model_result.accuracy * 100) }}%</span>
+                            </button>
+                        </h2>
+                        <div id="collapse-{{ model_name }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" aria-labelledby="heading-{{ model_name }}" data-bs-parent="#modelAccordion">
+                            <div class="accordion-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card mb-3">
+                                            <div class="card-header bg-light">
+                                                <h5>分类报告</h5>
+                                            </div>
+                                            <div class="card-body table-responsive">
+                                                <table class="table table-striped table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>类别</th>
+                                                            <th>精确率</th>
+                                                            <th>召回率</th>
+                                                            <th>F1得分</th>
+                                                            <th>样本数</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td>劣质 (0)</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('0', {}).get('precision', 0) * 100) }}%</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('0', {}).get('recall', 0) * 100) }}%</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('0', {}).get('f1-score', 0) * 100) }}%</td>
+                                                            <td>{{ model_result.report.get('0', {}).get('support', 0) }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>优质 (1)</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('1', {}).get('precision', 0) * 100) }}%</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('1', {}).get('recall', 0) * 100) }}%</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('1', {}).get('f1-score', 0) * 100) }}%</td>
+                                                            <td>{{ model_result.report.get('1', {}).get('support', 0) }}</td>
+                                                        </tr>
+                                                        <tr class="table-primary">
+                                                            <td>加权平均</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('weighted avg', {}).get('precision', 0) * 100) }}%</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('weighted avg', {}).get('recall', 0) * 100) }}%</td>
+                                                            <td>{{ "%.2f"|format(model_result.report.get('weighted avg', {}).get('f1-score', 0) * 100) }}%</td>
+                                                            <td>{{ model_result.report.get('weighted avg', {}).get('support', 0) }}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header bg-light">
+                                                <h5>模型说明</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                {% if model_name == 'naive_bayes' %}
+                                                    <p>高斯朴素贝叶斯是一种基于贝叶斯定理的分类器，假设特征之间相互独立且服从高斯分布。它在分类问题中表现良好，特别是当数据维度较高时。</p>
+                                                {% elif model_name == 'neural_network' %}
+                                                    <p>BP神经网络是一种多层感知器，通过反向传播算法学习模式，能够捕捉数据中的复杂非线性关系。此模型使用ReLU激活函数和Adam优化器。</p>
+                                                {% elif model_name == 'logistic_regression' %}
+                                                    <p>逻辑回归是一种线性分类算法，适用于二分类问题。它通过logistic函数将线性组合转换为概率值，用于预测样本属于某一类别的概率。</p>
+                                                {% elif model_name == 'random_forest' %}
+                                                    <p>随机森林是集成学习方法的一种，通过构建多个决策树并取平均值来进行分类。它能够处理高维数据和大量特征，并评估特征的重要性。</p>
+                                                {% elif model_name == 'knn' %}
+                                                    <p>K最近邻(KNN)算法基于"物以类聚"的原则，通过计算样本与训练集中样本的距离，将其分类为最接近的K个邻居中出现最多的类别。</p>
+                                                {% elif model_name == 'bagging' %}
+                                                    <p>装袋模型(Bagging)是一种集成学习方法，通过对训练数据进行多次随机采样训练多个基分类器，然后进行投票决策。它可以减少过拟合并提高模型稳定性。</p>
+                                                {% endif %}
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-info-circle me-2"></i> 该模型已保存，可在"品质预测"页面中使用。
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card-footer bg-white text-center">
+            <a href="{{ url_for('prediction_page') }}" class="btn btn-primary">
+                <i class="fas fa-magic me-2"></i> 进行品质预测
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // {% if model_comparison_chart %}
+            /* 使用安全的方式解析JSON数据 */
+            (function() {
+                var modelChart = JSON.parse('{{ model_comparison_chart|safe }}');
+                Plotly.newPlot('model-comparison-chart', modelChart.data, modelChart.layout);
+            })();
+        // {% endif %}
+    });
+</script>
+{% endblock %} 

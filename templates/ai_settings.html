@@ -1,0 +1,3267 @@
+{% extends "base.html" %}
+
+{% block title %}AI模型设置 - 苹果品质分析系统{% endblock %}
+
+{% block head %}
+<style>
+    .card-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .model-card {
+        border: 1px solid rgba(0,0,0,.125);
+        border-radius: 0.25rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    .model-card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    .model-card.disabled {
+        opacity: 0.7;
+    }
+    .api-key-field {
+        font-family: monospace;
+    }
+    .test-result {
+        margin-top: 15px;
+        padding: 12px 15px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+    .test-result.loading {
+        background-color: rgba(0, 123, 255, 0.1);
+        border-left: 4px solid #007bff;
+    }
+    .test-result.success {
+        background-color: rgba(40, 167, 69, 0.1);
+        border-left: 4px solid #28a745;
+    }
+    .test-result.error {
+        background-color: rgba(220, 53, 69, 0.1);
+        border-left: 4px solid #dc3545;
+    }
+    .test-result .message {
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    .test-result.success .message {
+        color: #28a745;
+    }
+    .test-result.error .message {
+        color: #dc3545;
+    }
+    .test-result .response {
+        background-color: rgba(255, 255, 255, 0.5);
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 0.9rem;
+        white-space: pre-wrap;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .test-result .response:empty {
+        display: none;
+    }
+
+    /* 模型列表样式 */
+    .models-list .model-item {
+        transition: all 0.2s ease;
+        background-color: #fff;
+    }
+
+    .models-list .model-item:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transform: translateY(-1px);
+    }
+
+    .models-list .disabled-model {
+        background-color: #f8f9fa;
+        opacity: 0.8;
+    }
+
+    .model-actions .btn-group {
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .model-info {
+        font-size: 0.85em;
+    }
+    .test-details {
+        font-size: 0.9rem;
+        background-color: rgba(255, 255, 255, 0.7);
+        border-radius: 4px;
+        padding: 8px;
+    }
+    .test-details-item {
+        display: flex;
+        margin-bottom: 5px;
+        border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+        padding-bottom: 5px;
+    }
+    .test-details-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .test-details-label {
+        font-weight: 500;
+        color: #666;
+        min-width: 120px;
+    }
+    .test-details-value {
+        flex: 1;
+        text-align: right;
+        color: #333;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+    .help-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    .help-section h5 {
+        color: #198754;
+        margin-bottom: 15px;
+    }
+    .provider-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        margin-left: 10px;
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    .provider-badge.deepseek {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .provider-badge.openai {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    .provider-badge.other {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    .api-endpoint-help {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    /* 模型加载动画 */
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    
+    .loading-indicator {
+        display: inline-block;
+        margin-left: 10px;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    .loading-text {
+        display: inline-flex;
+        align-items: center;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .model-loading {
+        position: relative;
+    }
+    
+    .model-loading::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    /* 连接测试按钮样式 */
+    .test-connection-btn {
+        transition: all 0.2s ease;
+    }
+    
+    .test-connection-btn:disabled {
+        cursor: not-allowed;
+    }
+    
+    /* 连接测试中的闪烁动画 */
+    @keyframes blink {
+        0% { opacity: 0.5; }
+        50% { opacity: 1; }
+        100% { opacity: 0.5; }
+    }
+    
+    .loading .message i {
+        animation: blink 1.5s infinite;
+    }
+    
+    /* 禁用样式 */
+    .card.disabled {
+        opacity: 0.75;
+        border-color: #dc3545;
+    }
+    
+    /* 模型选择下拉框样式 */
+    .model-select-dropdown {
+        min-width: 300px;
+        max-width: 500px;
+        width: auto;
+    }
+    
+    /* 模型选择按钮样式 */
+    .model-select-btn {
+        max-width: 100%;
+        text-align: left;
+        white-space: normal;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 25px;
+    }
+    
+    /* 下拉选项样式 */
+    .model-dropdown-item {
+        white-space: normal;
+        padding: 8px 16px;
+        word-break: break-word;
+    }
+    
+    /* 搜索框容器 */
+    .model-search-container {
+        padding: 8px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    /* 搜索结果容器 */
+    .model-select-options {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    /* 模型分组标题 */
+    .model-group-title {
+        font-weight: 600;
+        background-color: #f8f9fa;
+        padding: 6px 16px;
+        font-size: 0.9rem;
+        color: #495057;
+    }
+    
+    /* 无结果提示 */
+    .no-models-found {
+        padding: 16px;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* 左右分栏布局样式 */
+    .model-list-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 4px solid transparent;
+    }
+
+    .model-list-item:hover {
+        background-color: #f8f9fa;
+        border-left-color: #007bff;
+    }
+
+    .model-list-item.active {
+        background-color: #e3f2fd;
+        border-left-color: #007bff;
+        font-weight: 500;
+    }
+
+    .model-list-item h6 {
+        color: #333;
+        font-weight: 600;
+    }
+
+    .model-list-item.active h6 {
+        color: #007bff;
+    }
+
+    #model-details-card {
+        min-height: 500px;
+    }
+
+    .model-detail-row {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .model-detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .model-detail-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 5px;
+    }
+
+    .model-detail-value {
+        color: #333;
+        word-break: break-all;
+    }
+
+    .api-key-display {
+        font-family: monospace;
+        background-color: #f8f9fa;
+        padding: 8px 12px;
+        border-radius: 4px;
+        border: 1px solid #e9ecef;
+    }
+
+    /* API列表项样式 */
+    .api-list-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 4px solid transparent;
+    }
+
+    .api-list-item:hover {
+        background-color: #f8f9fa;
+        border-left-color: #007bff;
+    }
+
+    .api-list-item.active {
+        background-color: #e3f2fd;
+        border-left-color: #007bff;
+        font-weight: 500;
+    }
+
+    .api-list-item h6 {
+        color: #333;
+        font-weight: 600;
+    }
+
+    .api-list-item.active h6 {
+        color: #007bff;
+    }
+
+    /* 小模型卡片样式 */
+    .model-card-small {
+        border: 1px solid #e9ecef;
+        transition: all 0.2s ease;
+        height: 100%;
+    }
+
+    .model-card-small:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+
+    .model-card-small.disabled {
+        opacity: 0.7;
+        background-color: #f8f9fa;
+    }
+
+    .model-card-small .card-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+    }
+
+    .model-card-small .btn-group .btn {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>
+            <i class="fas fa-cogs"></i> AI模型设置
+        </h2>
+        <p class="text-muted">配置和管理用于苹果品质分析的AI模型</p>
+        
+        <button class="btn btn-success mb-4" data-bs-toggle="modal" data-bs-target="#addModelModal">
+            <i class="fas fa-plus-circle me-2"></i> 添加新模型
+        </button>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>支持的模型提供商：</strong> OpenAI及兼容OpenAI接口的服务
+        </div>
+    </div>
+</div>
+
+{% if models|length > 0 %}
+<div class="row">
+    <!-- 左侧：提供商列表 -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>模型列表
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="api-list">
+                    <!-- API列表将通过JavaScript动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：模型详情和配置 -->
+    <div class="col-md-8">
+        <div class="card" id="model-details-card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" id="api-details-title">
+                        <i class="fas fa-server me-2"></i>API配置与模型
+                    </h5>
+                    <div class="action-buttons">
+                        <button class="btn btn-warning btn-sm edit-api-btn" id="detail-edit-btn" data-bs-toggle="modal" data-bs-target="#editAPIModal">
+                            <i class="fas fa-edit me-2"></i>编辑API
+                        </button>
+                        <button class="btn btn-danger btn-sm delete-api-btn" id="detail-delete-btn">
+                            <i class="fas fa-trash-alt me-2"></i>删除API
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body" id="api-details-content">
+                <!-- API详情和模型列表将通过JavaScript动态加载 -->
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-server fa-3x mb-3"></i>
+                    <p>请从左侧选择一个API查看详情</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <p>
+        <i class="fas fa-info-circle me-2"></i>
+        您还没有配置任何AI模型。点击"添加新模型"按钮开始配置。
+    </p>
+</div>
+{% endif %}
+
+<!-- 添加模型的模态框 -->
+<div class="modal fade" id="addModelModal" tabindex="-1" aria-labelledby="addModelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addModelModalLabel"><i class="fas fa-plus-circle me-2"></i>添加新模型</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addModelForm" autocomplete="off">
+                    <div class="mb-3">
+                        <label for="modelName" class="form-label">模型名称</label>
+                        <input type="text" class="form-control" id="modelName" required placeholder="">
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelProvider" class="form-label">提供商</label>
+                        <select class="form-select" id="modelProvider" required>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelBaseUrl" class="form-label">API地址</label>
+                        <input type="text" class="form-control" id="modelBaseUrl" required placeholder="">
+                        <div class="form-text">/v1/chat/completions 路径自动添加，请输入基础地址</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelApiKey" class="form-label">API密钥</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="modelApiKey" required placeholder="输入API密钥" autocomplete="new-password">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="modelApiKey">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelId" class="form-label">模型选择</label>
+                        <div class="input-group mb-2">
+                            <div class="form-control model-select-container" style="height: auto; min-height: 38px; padding: 0.375rem 0.75rem;">
+                                <div id="selected-models-tags" class="d-flex flex-wrap gap-1"></div>
+                                <input type="text" id="model-search-input" class="border-0 w-100 mt-1" placeholder="输入关键词搜索模型..." autocomplete="off" style="outline: none; box-shadow: none;" disabled>
+                            </div>
+                            <button class="btn btn-outline-primary refresh-models-btn" type="button" id="refreshModelsBtn">
+                                <i class="fas fa-sync-alt me-1"></i>刷新模型
+                            </button>
+                        </div>
+                        
+                        <!-- 多选模型列表 -->
+                        <div id="models-dropdown" class="border rounded p-2 mt-1 d-none" style="max-height: 300px; overflow-y: auto;">
+                            <div id="search-results" class="model-list">
+                                <!-- 搜索结果和模型列表将通过JavaScript填充 -->
+                                <div class="text-center py-3">
+                                    <span class="text-muted">请先刷新获取可用模型</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 隐藏的实际存储选择的模型值的输入框 -->
+                        <input type="hidden" id="modelId" name="modelId" required>
+                        
+                        <div class="form-text model-id-help">请输入API地址和密钥后点击刷新获取可用模型，可选择多个模型导入</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success" id="saveNewModel">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑模型的模态框 -->
+<div class="modal fade" id="editModelModal" tabindex="-1" aria-labelledby="editModelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editModelModalLabel"><i class="fas fa-edit me-2"></i>编辑模型</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- 添加错误提示区域 -->
+                <div class="alert alert-danger d-none" id="edit-model-error">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="edit-model-error-message">获取模型详情时出错</span>
+                </div>
+                
+                <form id="editModelForm" autocomplete="off">
+                    <input type="hidden" id="editModelId">
+                    <input type="hidden" id="editModelIdName">
+                    <div class="mb-3">
+                        <label for="editModelName" class="form-label">模型名称</label>
+                        <input type="text" class="form-control" id="editModelName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModelProvider" class="form-label">提供商</label>
+                        <select class="form-select" id="editModelProvider" required>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModelBaseUrl" class="form-label">API地址</label>
+                        <input type="text" class="form-control" id="editModelBaseUrl" required placeholder="">
+                        <div class="form-text">/v1/chat/completions 路径自动添加，请输入基础地址</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModelApiKey" class="form-label">API密钥</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="editModelApiKey" placeholder="输入API密钥" autocomplete="new-password">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="editModelApiKey">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">当前显示的是现有的API密钥，可以直接修改。</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModelIdName" class="form-label">模型选择</label>
+                        <div class="input-group mb-2">
+                            <div class="form-control model-select-container" style="height: auto; min-height: 38px; padding: 0.375rem 0.75rem;">
+                                <div id="edit-selected-models-tags" class="d-flex flex-wrap gap-1"></div>
+                                <input type="text" id="edit-model-search-input" class="border-0 w-100 mt-1" placeholder="输入关键词搜索模型..." autocomplete="off" style="outline: none; box-shadow: none;" disabled>
+                            </div>
+                            <button class="btn btn-outline-primary refresh-models-btn" type="button" id="editRefreshModelsBtn">
+                                <i class="fas fa-sync-alt me-1"></i>刷新模型
+                            </button>
+                        </div>
+                        
+                        <!-- 多选模型列表 -->
+                        <div id="edit-models-dropdown" class="border rounded p-2 mt-1 d-none" style="max-height: 300px; overflow-y: auto;">
+                            <div id="edit-search-results" class="model-list">
+                                <!-- 搜索结果和模型列表将通过JavaScript填充 -->
+                                <div class="text-center py-3">
+                                    <span class="text-muted">请先刷新获取可用模型</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 隐藏的实际存储选择的模型值的输入框 -->
+                        <input type="hidden" id="editModelIdName" name="editModelIdName">
+                        
+                        <div class="form-text model-id-help">请输入API地址和密钥后点击刷新获取可用模型，可选择多个模型导入</div>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="editModelEnabled">
+                        <label class="form-check-label" for="editModelEnabled">启用模型</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" id="updateModel">保存更改</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑API的模态框 -->
+<div class="modal fade" id="editAPIModal" tabindex="-1" aria-labelledby="editAPIModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editAPIModalLabel"><i class="fas fa-edit me-2"></i>编辑API配置</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- 错误提示区域 -->
+                <div class="alert alert-danger d-none" id="edit-api-error">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="edit-api-error-message">编辑API时出错</span>
+                </div>
+
+                <form id="editAPIForm" autocomplete="off">
+                    <input type="hidden" id="editAPIKey">
+
+                    <div class="mb-2">
+                        <label for="editAPIName" class="form-label">API名称</label>
+                        <input type="text" class="form-control form-control-sm" id="editAPIName" required placeholder="为这个API配置起个名字">
+                    </div>
+
+                    <div class="mb-2">
+                        <label for="editAPIProvider" class="form-label">提供商</label>
+                        <select class="form-select form-select-sm" id="editAPIProvider" required>
+                            <option value="openai">OpenAI</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="claude">Claude</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label for="editAPIBaseUrl" class="form-label">API基础地址</label>
+                        <input type="text" class="form-control form-control-sm" id="editAPIBaseUrl" required placeholder="https://api.openai.com/v1">
+                    </div>
+
+                    <div class="mb-2">
+                        <label for="editAPIApiKey" class="form-label">API密钥</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" class="form-control" id="editAPIApiKey" required placeholder="输入API密钥" autocomplete="new-password">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="editAPIApiKey">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">关联的模型</label>
+                        <div class="mb-2">
+                            <span class="text-muted">当前模型列表</span>
+                        </div>
+                        <div id="edit-api-models-list" class="border rounded p-2" style="max-height: 120px; overflow-y: auto;">
+                            <!-- 模型列表将通过JavaScript填充 -->
+                        </div>
+                        <div class="form-text">这个API配置下的所有模型，可以删除现有模型或添加新模型</div>
+                    </div>
+
+                    <!-- 选择模型区域 -->
+                    <div class="mb-3">
+                        <label class="form-label">选择模型</label>
+
+                        <!-- 大红框区域 - 模型列表展示 -->
+                        <div id="models-display-container" class="border rounded p-2" style="min-height: 150px; max-height: 250px; overflow-y: auto; border-color: #dc3545 !important; border-width: 2px !important; background-color: #fff;">
+                            <div class="text-center py-4 text-muted">
+                                <i class="fas fa-robot fa-2x mb-3"></i>
+                                <p class="mb-2">请点击下方"获取可用模型"按钮</p>
+                                <small>获取后将在此区域显示所有可用模型</small>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-2">
+                            <button type="button" class="btn btn-outline-primary" id="refresh-available-models-btn">
+                                <i class="fas fa-sync-alt me-1"></i>获取可用模型
+                            </button>
+                        </div>
+
+                        <div class="form-text mt-2">点击上方按钮获取可用模型，然后在红框区域中选择要添加的模型</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" id="updateAPI">保存更改</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 确认删除的模态框 -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>确认删除</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>您确定要删除模型 <strong id="deleteModelName"></strong> 吗？此操作无法撤销。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">确认删除</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 左右分栏交互逻辑
+        const apiListContainer = document.getElementById('api-list');
+        const apiDetailsContent = document.getElementById('api-details-content');
+        const apiDetailsTitle = document.getElementById('api-details-title');
+        const detailEditBtn = document.getElementById('detail-edit-btn');
+        const detailDeleteBtn = document.getElementById('detail-delete-btn');
+
+        // 存储所有模型数据
+        const rawModels = JSON.parse('{{ models|tojson|safe }}');
+        console.log('从后端接收到的原始模型数据:', rawModels);
+        console.log('模型数量:', rawModels.length);
+
+        const modelsData = rawModels.reduce((acc, model) => {
+            acc[model.id] = model;
+            return acc;
+        }, {});
+
+        console.log('处理后的模型数据对象:', modelsData);
+        console.log('模型数据对象键数量:', Object.keys(modelsData).length);
+
+        // 页面状态记忆功能
+        const pageState = {
+            selectedGroupName: null,
+            scrollPosition: 0,
+            expandedTestResults: new Set()
+        };
+
+        // 保存页面状态到localStorage
+        function savePageState() {
+            try {
+                localStorage.setItem('ai_settings_page_state', JSON.stringify({
+                    selectedGroupName: pageState.selectedGroupName,
+                    scrollPosition: window.pageYOffset || document.documentElement.scrollTop,
+                    expandedTestResults: Array.from(pageState.expandedTestResults)
+                }));
+            } catch (e) {
+                console.warn('无法保存页面状态:', e);
+            }
+        }
+
+        // 从localStorage恢复页面状态
+        function restorePageState() {
+            try {
+                const saved = localStorage.getItem('ai_settings_page_state');
+                if (saved) {
+                    const state = JSON.parse(saved);
+                    pageState.selectedGroupName = state.selectedGroupName;
+                    pageState.scrollPosition = state.scrollPosition || 0;
+                    pageState.expandedTestResults = new Set(state.expandedTestResults || []);
+                    return true;
+                }
+            } catch (e) {
+                console.warn('无法恢复页面状态:', e);
+            }
+            return false;
+        }
+
+        // 恢复滚动位置
+        function restoreScrollPosition() {
+            if (pageState.scrollPosition > 0) {
+                setTimeout(() => {
+                    window.scrollTo(0, pageState.scrollPosition);
+                }, 100);
+            }
+        }
+
+        // 恢复展开的测试结果
+        function restoreExpandedTestResults() {
+            pageState.expandedTestResults.forEach(modelId => {
+                const resultContainer = document.getElementById(`test-result-${modelId}`);
+                if (resultContainer && resultContainer.classList.contains('d-none')) {
+                    resultContainer.classList.remove('d-none');
+                }
+            });
+        }
+
+        // 获取提供商显示名称
+        function getProviderDisplayName(provider) {
+            const providerNames = {
+                'openai': 'OpenAI',
+                'anthropic': 'Anthropic',
+                'google': 'Google',
+                'azure': 'Azure OpenAI',
+                'huggingface': 'Hugging Face',
+                'ollama': 'Ollama',
+                'custom': '自定义'
+            };
+            return providerNames[provider] || provider.toUpperCase();
+        }
+
+        // 获取简化的API地址显示（只显示域名）
+        function getSimplifiedApiUrl(baseUrl) {
+            try {
+                const url = new URL(baseUrl);
+                return url.hostname;
+            } catch (e) {
+                // 如果不是有效的URL，返回原始字符串的前30个字符
+                return baseUrl.length > 30 ? baseUrl.substring(0, 30) + '...' : baseUrl;
+            }
+        }
+
+        // 按API分组模型数据
+        function groupModelsByAPI() {
+            const apiGroups = {};
+
+            Object.values(modelsData).forEach(model => {
+                const apiKey = `${model.base_url}|${model.provider}`;
+                if (!apiGroups[apiKey]) {
+                    apiGroups[apiKey] = {
+                        base_url: model.base_url,
+                        provider: model.provider,
+                        api_key: model.api_key,
+                        models: []
+                    };
+                }
+                apiGroups[apiKey].models.push(model);
+            });
+
+            return apiGroups;
+        }
+
+        // 渲染左侧模型列表（按模型名称分组）
+        function renderAPIList() {
+            // 保存当前状态
+            savePageState();
+
+            apiListContainer.innerHTML = '';
+
+            // 按模型名称分组
+            const modelGroups = groupModelsByName();
+
+            if (Object.keys(modelGroups).length === 0) {
+                apiListContainer.innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-robot fa-2x mb-2"></i><br>暂无配置的模型</div>';
+                apiDetailsContent.innerHTML = '<div class="text-center text-muted py-5"><i class="fas fa-plus fa-3x mb-3"></i><p>请点击"添加新模型"按钮开始配置</p></div>';
+                return;
+            }
+
+            // 尝试恢复之前选中的分组，如果没有则选择第一个
+            let selectedGroupName = pageState.selectedGroupName;
+            let hasSelectedGroup = false;
+
+            // 检查之前选中的分组是否还存在
+            if (selectedGroupName && !modelGroups[selectedGroupName]) {
+                selectedGroupName = null;
+            }
+
+            // 如果没有选中的分组，选择第一个
+            if (!selectedGroupName) {
+                selectedGroupName = Object.keys(modelGroups)[0];
+            }
+
+            Object.entries(modelGroups).forEach(([groupName, groupData]) => {
+                const isSelected = groupName === selectedGroupName;
+                const groupItem = document.createElement('div');
+                groupItem.className = `list-group-item list-group-item-action api-list-item ${isSelected ? 'active' : ''}`;
+                groupItem.dataset.groupName = groupName;
+
+                // 计算可用模型数量
+                const enabledCount = groupData.models.filter(m => m.enabled).length;
+                const totalCount = groupData.models.length;
+
+                // 获取提供商显示名称
+                const providerName = getProviderDisplayName(groupData.provider);
+
+                groupItem.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${groupName}</h6>
+                            <small class="text-muted">${getSimplifiedApiUrl(groupData.base_url)} • ${totalCount} 个模型</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge ${enabledCount > 0 ? 'bg-success' : 'bg-danger'}">
+                                ${enabledCount}/${totalCount} 可用
+                            </span>
+                        </div>
+                    </div>
+                `;
+
+                // 添加点击事件
+                groupItem.addEventListener('click', function() {
+                    // 移除其他项的active类
+                    document.querySelectorAll('.api-list-item').forEach(i => i.classList.remove('active'));
+                    // 添加当前项的active类
+                    this.classList.add('active');
+                    // 更新状态
+                    pageState.selectedGroupName = groupName;
+                    // 显示分组详情
+                    showGroupDetails(groupName, groupData);
+                });
+
+                apiListContainer.appendChild(groupItem);
+
+                // 显示选中分组的详情
+                if (isSelected) {
+                    showGroupDetails(groupName, groupData);
+                    hasSelectedGroup = true;
+                }
+            });
+
+            // 恢复滚动位置和展开的测试结果
+            setTimeout(() => {
+                restoreScrollPosition();
+                restoreExpandedTestResults();
+            }, 150);
+        }
+
+        // 按模型名称分组
+        function groupModelsByName() {
+            const nameGroups = {};
+
+            Object.values(modelsData).forEach(model => {
+                const groupName = model.name;
+                if (!nameGroups[groupName]) {
+                    nameGroups[groupName] = {
+                        name: groupName,
+                        provider: model.provider,
+                        base_url: model.base_url,
+                        api_key: model.api_key,
+                        models: []
+                    };
+                }
+                nameGroups[groupName].models.push(model);
+            });
+
+            // 按名称排序
+            const sortedGroups = {};
+            Object.keys(nameGroups).sort((a, b) => a.localeCompare(b)).forEach(key => {
+                sortedGroups[key] = nameGroups[key];
+            });
+
+            return sortedGroups;
+        }
+
+        // 显示分组详情（API配置 + 该分组下的所有模型）
+        function showGroupDetails(groupName, groupData) {
+            // 获取提供商显示名称
+            const providerName = getProviderDisplayName(groupData.provider);
+
+            // 更新标题
+            apiDetailsTitle.innerHTML = `<i class="fas fa-layer-group me-2"></i>${groupName}`;
+
+            // 更新按钮的data属性
+            detailEditBtn.dataset.groupName = groupName;
+            detailDeleteBtn.dataset.groupName = groupName;
+
+            // 生成API配置信息
+            const apiConfigHTML = `
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-cog me-2"></i>API配置信息
+                        </h5>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">配置名称</div>
+                            <div class="model-detail-value">
+                                <strong>${groupName}</strong>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">提供商</div>
+                            <div class="model-detail-value">
+                                ${providerName}
+                                <span class="badge bg-secondary ms-2">${groupData.provider.toUpperCase()}</span>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">API基础地址</div>
+                            <div class="model-detail-value">
+                                <code>${groupData.base_url}</code>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">API密钥</div>
+                            <div class="model-detail-value">
+                                <div class="api-key-display">
+                                    ${groupData.api_key ? '*'.repeat(10) + groupData.api_key.slice(-5) : '未设置'}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">模型数量</div>
+                            <div class="model-detail-value">
+                                <span class="badge bg-info">${groupData.models.length} 个模型</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 生成模型列表
+            const modelsListHTML = `
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-robot me-2"></i>模型列表
+                        </h5>
+                        <div class="models-list">
+                            ${groupData.models.map(model => `
+                                <div class="model-item border rounded p-3 mb-3 ${model.enabled ? '' : 'disabled-model'}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <h6 class="mb-0 me-2">${model.model}</h6>
+                                                <span class="badge ${model.enabled ? 'bg-success' : 'bg-danger'}">
+                                                    ${model.enabled ? '可用' : '未连接'}
+                                                </span>
+                                            </div>
+                                            <div class="model-info">
+                                                <small class="text-muted d-block">模型ID: ${model.id}</small>
+                                                ${model.last_tested ? `<small class="text-muted d-block">最后测试: ${model.last_tested}</small>` : ''}
+                                            </div>
+                                        </div>
+                                        <div class="model-actions">
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button class="btn btn-outline-primary test-connection-btn" data-model-id="${model.id}">
+                                                    <i class="fas fa-plug"></i> 测试
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-model-btn" data-model-id="${model.id}" data-model-name="${model.model}">
+                                                    <i class="fas fa-trash"></i> 删除
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 测试结果区域 -->
+                                    <div class="test-result bg-light d-none mt-3" id="test-result-${model.id}">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <p class="message mb-0"></p>
+                                            <button class="btn btn-sm btn-outline-secondary collapse-test-result" data-model-id="${model.id}" title="折叠测试结果">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        <div class="response"></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            apiDetailsContent.innerHTML = apiConfigHTML + modelsListHTML;
+        }
+
+        // 显示单个模型的详情
+        function showModelDetails(model) {
+            // 获取提供商显示名称
+            const providerName = getProviderDisplayName(model.provider);
+
+            // 更新标题
+            apiDetailsTitle.innerHTML = `<i class="fas fa-robot me-2"></i>${model.name}`;
+
+            // 更新按钮的data属性（暂时保留，但可能需要修改）
+            detailEditBtn.dataset.modelId = model.id;
+            detailDeleteBtn.dataset.modelId = model.id;
+
+            // 生成模型详情HTML
+            const modelDetailsHTML = `
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-cog me-2"></i>模型配置信息
+                        </h5>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">模型名称</div>
+                            <div class="model-detail-value">
+                                <strong>${model.name}</strong>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">模型ID</div>
+                            <div class="model-detail-value">
+                                <code>${model.model}</code>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">提供商</div>
+                            <div class="model-detail-value">
+                                ${providerName}
+                                <span class="badge bg-secondary ms-2">${model.provider.toUpperCase()}</span>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">API基础地址</div>
+                            <div class="model-detail-value">
+                                <code>${model.base_url}</code>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">API密钥</div>
+                            <div class="model-detail-value">
+                                <div class="api-key-display">
+                                    ${model.api_key ? '*'.repeat(10) + model.api_key.slice(-5) : '未设置'}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">状态</div>
+                            <div class="model-detail-value">
+                                <span class="badge ${model.enabled ? 'bg-success' : 'bg-danger'}">
+                                    ${model.enabled ? '可用' : '未连接'}
+                                </span>
+                            </div>
+                        </div>
+                        ${model.last_tested ? `
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">最后测试时间</div>
+                            <div class="model-detail-value">${model.last_tested}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary test-connection-btn" data-model-id="${model.id}">
+                                <i class="fas fa-plug me-1"></i>测试连接
+                            </button>
+                            <button class="btn btn-outline-danger delete-model-btn" data-model-id="${model.id}" data-model-name="${model.name}">
+                                <i class="fas fa-trash me-1"></i>删除模型
+                            </button>
+                        </div>
+                        <!-- 测试结果区域 -->
+                        <div class="test-result bg-light d-none mt-3" id="test-result-${model.id}">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <p class="message mb-0"></p>
+                                <button class="btn btn-sm btn-outline-secondary collapse-test-result" data-model-id="${model.id}" title="折叠测试结果">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="response"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            apiDetailsContent.innerHTML = modelDetailsHTML;
+        }
+
+        // 显示API详情和模型列表的函数
+        function showAPIDetails(apiKey, apiData) {
+            // 获取第一个模型的ID作为显示名称，如果没有模型则使用提供商名称
+            const displayName = apiData.models.length > 0 ? apiData.models[0].model : `${apiData.provider.toUpperCase()} API`;
+
+            // 更新标题
+            apiDetailsTitle.innerHTML = `<i class="fas fa-server me-2"></i>${displayName}`;
+
+            // 更新按钮的data属性
+            detailEditBtn.dataset.apiKey = apiKey;
+            detailDeleteBtn.dataset.apiKey = apiKey;
+
+            // 生成API配置信息
+            const apiConfigHTML = `
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-cog me-2"></i>API配置信息
+                        </h5>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">提供商</div>
+                            <div class="model-detail-value">
+                                ${apiData.provider}
+                                <span class="badge bg-secondary ms-2">${apiData.provider.toUpperCase()}</span>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">API基础地址</div>
+                            <div class="model-detail-value">
+                                <code>${apiData.base_url}</code>
+                            </div>
+                        </div>
+                        <div class="model-detail-row">
+                            <div class="model-detail-label">API密钥</div>
+                            <div class="model-detail-value">
+                                <div class="api-key-display">
+                                    ${apiData.api_key ? '*'.repeat(10) + apiData.api_key.slice(-5) : '未设置'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 生成模型列表
+            const modelsListHTML = `
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-robot me-2"></i>可用模型列表 (${apiData.models.length} 个)
+                        </h5>
+                        <div class="row">
+                            ${apiData.models.map(model => `
+                                <div class="col-md-6 mb-3">
+                                    <div class="card model-card-small ${model.enabled ? '' : 'disabled'}">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div class="flex-grow-1">
+                                                    <div class="model-id-display mb-1">
+                                                        <span class="badge bg-success me-2">${model.model}</span>
+                                                    </div>
+                                                </div>
+                                                <span class="badge ${model.enabled ? 'bg-success' : 'bg-danger'}">
+                                                    ${model.enabled ? '可用' : '未连接'}
+                                                </span>
+                                            </div>
+                                            <div class="btn-group btn-group-sm w-100 mt-2" role="group">
+                                                <button class="btn btn-outline-primary test-connection-btn" data-model-id="${model.id}">
+                                                    <i class="fas fa-plug"></i> 测试
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-model-btn" data-model-id="${model.id}" data-model-name="${model.model}">
+                                                    <i class="fas fa-trash"></i> 删除
+                                                </button>
+                                            </div>
+                                            <!-- 测试结果区域 -->
+                                            <div class="test-result bg-light d-none mt-2" id="test-result-${model.id}">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <p class="message mb-0"></p>
+                                                    <button class="btn btn-sm btn-outline-secondary collapse-test-result" data-model-id="${model.id}" title="折叠测试结果">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="response"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            apiDetailsContent.innerHTML = apiConfigHTML + modelsListHTML;
+        }
+
+        // 初始化页面状态
+        restorePageState();
+
+        // 初始化模型列表
+        renderAPIList();
+
+        // 页面离开时保存状态
+        window.addEventListener('beforeunload', savePageState);
+
+        // 滚动时更新状态
+        let scrollTimeout;
+        window.addEventListener('scroll', function() {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                pageState.scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+            }, 100);
+        });
+
+
+
+        // 生成唯一的模型ID
+        function generateModelId() {
+            return 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+
+
+
+
+
+
+        // 编辑API按钮点击事件
+        document.getElementById('detail-edit-btn').addEventListener('click', function() {
+            const groupName = this.dataset.groupName;
+            if (groupName) {
+                openEditGroupModal(groupName);
+            }
+        });
+
+        // 打开编辑分组模态框
+        function openEditGroupModal(groupName) {
+            const modelGroups = groupModelsByName();
+            const groupData = modelGroups[groupName];
+
+            if (!groupData) {
+                showToast('找不到指定的模型分组', 'error');
+                return;
+            }
+
+            // 隐藏错误提示
+            const errorAlert = document.getElementById('edit-api-error');
+            errorAlert.classList.add('d-none');
+
+            // 填充表单数据
+            fillEditGroupForm(groupName, groupData);
+
+            // 显示编辑模态框
+            const modal = new bootstrap.Modal(document.getElementById('editAPIModal'));
+            modal.show();
+        }
+
+        // 打开编辑API模态框（保留原有功能）
+        function openEditAPIModal(apiKey) {
+            const apiGroups = groupModelsByAPI();
+            const apiData = apiGroups[apiKey];
+
+            if (!apiData) {
+                showToast('找不到指定的API配置', 'error');
+                return;
+            }
+
+            // 隐藏错误提示
+            const errorAlert = document.getElementById('edit-api-error');
+            errorAlert.classList.add('d-none');
+
+            // 填充表单数据
+            fillEditAPIForm(apiKey, apiData);
+        }
+
+        // 填充编辑分组表单
+        function fillEditGroupForm(groupName, groupData) {
+            // 基础信息填充
+            document.getElementById('editAPIKey').value = `${groupData.base_url}|${groupData.provider}`;
+            document.getElementById('editAPIName').value = groupName;
+            document.getElementById('editAPIProvider').value = groupData.provider || 'openai';
+            document.getElementById('editAPIBaseUrl').value = groupData.base_url || '';
+
+            // API密钥填充 - 延迟设置避免被清空
+            setTimeout(() => {
+                document.getElementById('editAPIApiKey').value = groupData.api_key || '';
+            }, 150);
+
+            // 填充关联的模型列表
+            renderEditGroupModelsList(groupData);
+
+            // 重置模型选择
+            document.getElementById('model-select').innerHTML = '<option value="">请选择模型</option>';
+        }
+
+        // 填充编辑API表单（保留原有功能）
+        function fillEditAPIForm(apiKey, apiData) {
+            // 基础信息填充
+            document.getElementById('editAPIKey').value = apiKey;
+            document.getElementById('editAPIName').value = apiData.models.length > 0 ? apiData.models[0].name : '';
+            document.getElementById('editAPIProvider').value = apiData.provider || 'openai';
+            document.getElementById('editAPIBaseUrl').value = apiData.base_url || '';
+
+            // API密钥填充 - 延迟设置避免被清空
+            setTimeout(() => {
+                document.getElementById('editAPIApiKey').value = apiData.api_key || '';
+            }, 150);
+
+            // 填充关联的模型列表
+            renderEditAPIModelsList(apiData);
+
+            // 重置模型选择
+            document.getElementById('model-select').innerHTML = '<option value="">请选择模型</option>';
+        }
+
+        // 渲染编辑分组的模型列表
+        function renderEditGroupModelsList(groupData) {
+            const modelsListContainer = document.getElementById('edit-api-models-list');
+            modelsListContainer.innerHTML = '';
+
+            if (groupData.models.length === 0) {
+                modelsListContainer.innerHTML = '<div class="text-muted text-center py-3">没有关联的模型</div>';
+            } else {
+                groupData.models.forEach(model => {
+                    const modelItem = document.createElement('div');
+                    modelItem.className = 'border-bottom pb-2 mb-2';
+                    modelItem.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">${model.model}</div>
+                                <small class="text-muted">模型ID: ${model.id}</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge ${model.enabled ? 'bg-success' : 'bg-danger'}">
+                                    ${model.enabled ? '可用' : '未连接'}
+                                </span>
+                                <button type="button" class="btn btn-outline-danger btn-sm delete-group-model-btn"
+                                        data-model-id="${model.id}" data-model-name="${model.model}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    modelsListContainer.appendChild(modelItem);
+                });
+
+                // 添加删除按钮事件
+                modelsListContainer.querySelectorAll('.delete-group-model-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const modelId = this.dataset.modelId;
+                        const modelName = this.dataset.modelName;
+                        deleteGroupModel(modelId, modelName);
+                    });
+                });
+            }
+        }
+
+        // 渲染编辑API的模型列表（保留原有功能）
+        function renderEditAPIModelsList(apiData) {
+            const modelsListContainer = document.getElementById('edit-api-models-list');
+            modelsListContainer.innerHTML = '';
+
+            if (apiData.models.length === 0) {
+                modelsListContainer.innerHTML = '<div class="text-muted text-center py-3">没有关联的模型</div>';
+            } else {
+                apiData.models.forEach(model => {
+                    const modelItem = document.createElement('div');
+                    modelItem.className = 'border-bottom pb-2 mb-2';
+                    modelItem.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">${model.model}</div>
+                                <small class="text-muted">配置名称: ${model.name}</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge ${model.enabled ? 'bg-success' : 'bg-danger'}">
+                                    ${model.enabled ? '可用' : '未连接'}
+                                </span>
+                                <button type="button" class="btn btn-outline-danger btn-sm delete-api-model-btn"
+                                        data-model-id="${model.id}" data-model-name="${model.model}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    modelsListContainer.appendChild(modelItem);
+                });
+
+                // 添加删除按钮事件
+                modelsListContainer.querySelectorAll('.delete-api-model-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const modelId = this.dataset.modelId;
+                        const modelName = this.dataset.modelName;
+                        deleteAPIModel(modelId, modelName);
+                    });
+                });
+            }
+        }
+
+        // 删除分组中的模型
+        function deleteGroupModel(modelId, modelName) {
+            if (!confirm(`确定要删除模型 "${modelName}" 吗？此操作无法撤销。`)) {
+                return;
+            }
+
+            try {
+                // 发送删除请求到后端
+                fetch(`/api/ai_models/delete/${modelId}`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 从全局数据中删除
+                        delete modelsData[modelId];
+
+                        showToast(`已删除模型: ${modelName}`, 'success');
+
+                        // 重新渲染模型列表
+                        const groupName = document.getElementById('editAPIName').value;
+                        const modelGroups = groupModelsByName();
+                        const groupData = modelGroups[groupName];
+                        if (groupData) {
+                            renderEditGroupModelsList(groupData);
+                        }
+
+                        // 刷新主界面
+                        renderAPIList();
+                    } else {
+                        showToast('删除模型失败: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('删除模型时出错:', error);
+                    showToast('删除模型时出错: ' + error.message, 'error');
+                });
+            } catch (error) {
+                console.error('删除模型时出错:', error);
+                showToast('删除模型时出错: ' + error.message, 'error');
+            }
+        }
+
+        // 删除API模型（保留原有功能）
+        function deleteAPIModel(modelId, modelName) {
+            if (!confirm(`确定要删除模型 "${modelName}" 吗？此操作无法撤销。`)) {
+                return;
+            }
+
+            try {
+                // 发送删除请求到后端
+                fetch(`/api/ai_models/delete/${modelId}`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 从全局数据中删除
+                        delete modelsData[modelId];
+
+                        showToast(`已删除模型: ${modelName}`, 'success');
+
+                        // 重新渲染模型列表
+                        const apiKey = document.getElementById('editAPIKey').value;
+                        const apiGroups = groupModelsByAPI();
+                        const apiData = apiGroups[apiKey];
+                        if (apiData) {
+                            renderEditAPIModelsList(apiData);
+                        }
+
+                        // 刷新主界面
+                        renderAPIList();
+                    } else {
+                        showToast('删除模型失败: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('删除模型时出错:', error);
+                    showToast('删除模型时出错: ' + error.message, 'error');
+                });
+            } catch (error) {
+                console.error('删除模型时出错:', error);
+                showToast('删除模型时出错: ' + error.message, 'error');
+            }
+        }
+
+
+
+        // 为编辑API获取可用模型
+        function fetchAvailableModelsForEdit(baseUrl, apiKey, button) {
+            const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+            const modelsUrl = `${cleanBaseUrl}/v1/models`;
+
+            // 显示加载状态
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>获取中...';
+
+            const modelsSelect = document.getElementById('model-select');
+            modelsSelect.innerHTML = '<option value="">获取中...</option>';
+
+            fetch(modelsUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.data && Array.isArray(data.data)) {
+                    const models = data.data.map(model => model.id).sort();
+
+                    // 填充模型选择框
+                    modelsSelect.innerHTML = '<option value="">请选择模型</option>';
+                    models.forEach(modelId => {
+                        const option = document.createElement('option');
+                        option.value = modelId;
+                        option.textContent = modelId;
+                        modelsSelect.appendChild(option);
+                    });
+
+                    showToast(`获取到 ${models.length} 个可用模型`, 'success');
+                } else {
+                    throw new Error('API响应格式不正确');
+                }
+            })
+            .catch(error => {
+                console.error('获取模型列表失败:', error);
+                modelsSelect.innerHTML = '<option value="">获取失败</option>';
+                showToast(`获取模型列表失败: ${error.message}`, 'error');
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-sync-alt me-1"></i>获取可用模型';
+            });
+        }
+
+
+
+        // 添加选中的模型
+        async function addSelectedModel() {
+            try {
+                // 获取选中的模型
+                const modelsSelect = document.getElementById('model-select');
+                const selectedModel = modelsSelect.value;
+
+                if (!selectedModel) {
+                    showToast('请先选择一个模型', 'error');
+                    return;
+                }
+
+                // 获取表单数据
+                const apiName = document.getElementById('editAPIName').value.trim();
+                const provider = document.getElementById('editAPIProvider').value;
+                const baseUrl = document.getElementById('editAPIBaseUrl').value.trim();
+                const apiKey = document.getElementById('editAPIApiKey').value.trim();
+
+                // 验证必填字段
+                if (!apiName || !baseUrl || !apiKey) {
+                    const missingFields = [];
+                    if (!apiName) missingFields.push('API名称');
+                    if (!baseUrl) missingFields.push('API地址');
+                    if (!apiKey) missingFields.push('API密钥');
+                    showToast(`请填写: ${missingFields.join(', ')}`, 'error');
+                    return;
+                }
+
+                // 创建新模型数据
+                const newModelData = {
+                    id: generateModelId(),
+                    name: apiName,
+                    provider: provider,
+                    base_url: baseUrl,
+                    api_key: apiKey,
+                    model: selectedModel,
+                    enabled: true,
+                    last_tested: null
+                };
+
+                // 发送到后端保存
+                const response = await fetch('/api/ai_models/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newModelData)
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.model) {
+                    // 更新全局数据（使用后端返回的ID）
+                    modelsData[result.model.id] = result.model;
+                } else {
+                    throw new Error(result.message || '保存失败');
+                }
+
+                // 刷新界面
+                const currentApiKey = document.getElementById('editAPIKey').value;
+                const apiGroups = groupModelsByAPI();
+                const apiData = apiGroups[currentApiKey];
+
+                if (apiData) {
+                    renderEditAPIModelsList(apiData);
+                }
+
+                // 从下拉选择框中移除已添加的模型
+                const optionToRemove = modelsSelect.querySelector(`option[value="${selectedModel}"]`);
+                if (optionToRemove) {
+                    optionToRemove.remove();
+                    modelsSelect.value = ''; // 重置选择
+                }
+
+                showToast(`已添加模型: ${selectedModel}`, 'success');
+
+            } catch (error) {
+                console.error('添加模型时出错:', error);
+                showToast('添加模型时出错: ' + error.message, 'error');
+            }
+        }
+
+        // 获取可用模型按钮事件
+        document.getElementById('refresh-available-models-btn').addEventListener('click', function() {
+            const baseUrl = document.getElementById('editAPIBaseUrl').value.trim();
+            const apiKey = document.getElementById('editAPIApiKey').value.trim();
+
+            if (!baseUrl || !apiKey) {
+                showToast('请先填写API地址和API密钥', 'error');
+                return;
+            }
+
+            // 获取可用模型并显示在大红框中
+            fetchAndShowAvailableModels(baseUrl, apiKey, this);
+        });
+
+        // 获取并显示可用模型
+        function fetchAndShowAvailableModels(baseUrl, apiKey, button) {
+            const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+            const modelsUrl = `${cleanBaseUrl}/v1/models`;
+            const container = document.getElementById('models-display-container');
+
+            // 显示加载状态
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>获取中...';
+
+            container.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-3 mb-0">正在获取可用模型...</p>
+                </div>
+            `;
+
+            fetch(modelsUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.data && Array.isArray(data.data)) {
+                    const models = data.data.map(model => model.id).sort();
+                    renderAvailableModelsInRedBox(models);
+                    showToast(`获取到 ${models.length} 个可用模型`, 'success');
+                } else {
+                    throw new Error('API响应格式不正确');
+                }
+            })
+            .catch(error => {
+                console.error('获取模型列表失败:', error);
+                container.innerHTML = `
+                    <div class="text-center py-4 text-danger">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <p class="mb-2">获取模型列表失败</p>
+                        <small>${error.message}</small>
+                    </div>
+                `;
+                showToast(`获取模型列表失败: ${error.message}`, 'error');
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-sync-alt me-1"></i>获取可用模型';
+            });
+        }
+
+        // 在大红框中渲染可用模型
+        function renderAvailableModelsInRedBox(models) {
+            const container = document.getElementById('models-display-container');
+
+            if (models.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-robot fa-3x mb-3"></i>
+                        <p class="mb-0">没有找到可用模型</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 获取当前已添加的模型
+            const currentApiKey = document.getElementById('editAPIKey').value;
+            const apiGroups = groupModelsByAPI();
+            const currentApiData = apiGroups[currentApiKey];
+            const existingModelIds = currentApiData ? currentApiData.models.map(m => m.model) : [];
+
+            // 生成模型列表HTML
+            const modelsHTML = models.map(modelId => {
+                const isAdded = existingModelIds.includes(modelId);
+                return `
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <div>
+                            <div class="fw-bold">${modelId}</div>
+                            <small class="text-muted">模型ID: ${modelId}</small>
+                        </div>
+                        <button type="button" class="btn ${isAdded ? 'btn-success' : 'btn-outline-success'} ${isAdded ? '' : 'add-model-btn'}"
+                                ${isAdded ? 'disabled' : ''} data-model-id="${modelId}" style="width: 100px; height: 32px; font-size: 14px;">
+                            ${isAdded ? '已添加' : '添加'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = modelsHTML;
+
+            // 添加"添加"按钮事件
+            container.querySelectorAll('.add-model-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const modelId = this.dataset.modelId;
+                    addModelFromRedBox(modelId, this);
+                });
+            });
+        }
+
+        // 从大红框添加模型
+        async function addModelFromRedBox(modelId, button) {
+            try {
+                // 获取表单数据
+                const apiName = document.getElementById('editAPIName').value.trim();
+                const provider = document.getElementById('editAPIProvider').value;
+                const baseUrl = document.getElementById('editAPIBaseUrl').value.trim();
+                const apiKey = document.getElementById('editAPIApiKey').value.trim();
+
+                // 验证必填字段
+                if (!apiName || !baseUrl || !apiKey) {
+                    showToast('请先填写完整的API配置信息', 'error');
+                    return;
+                }
+
+                // 禁用按钮，显示加载状态
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 添加中...';
+
+                // 创建新模型数据
+                const newModelData = {
+                    name: apiName,
+                    provider: provider,
+                    base_url: baseUrl,
+                    api_key: apiKey,
+                    model: modelId,
+                    enabled: true
+                };
+
+                try {
+                    // 发送到后端保存
+                    const response = await fetch('/api/ai_models/add', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(newModelData)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // 添加到全局数据（使用后端返回的ID）
+                        if (result.model) {
+                            modelsData[result.model.id] = result.model;
+                        }
+
+                        // 更新按钮状态
+                        button.outerHTML = '<button type="button" class="btn btn-success" disabled style="width: 100px; height: 32px; font-size: 14px;">已添加</button>';
+
+                        // 刷新编辑界面的模型列表
+                        const currentApiKey = document.getElementById('editAPIKey').value;
+                        const apiGroups = groupModelsByAPI();
+                        const apiData = apiGroups[currentApiKey];
+                        if (apiData) {
+                            renderEditAPIModelsList(apiData);
+                        }
+
+                        showToast(`已添加模型: ${modelId}`, 'success');
+                    } else {
+                        throw new Error(result.message || '保存失败');
+                    }
+                } catch (error) {
+                    console.error('保存模型时出错:', error);
+                    showToast('保存模型失败: ' + error.message, 'error');
+
+                    // 恢复按钮状态
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-plus me-1"></i>添加';
+                }
+
+            } catch (error) {
+                console.error('添加模型时出错:', error);
+                showToast('添加模型时出错: ' + error.message, 'error');
+            }
+        }
+
+
+
+        // 保存API更改
+        document.getElementById('updateAPI').addEventListener('click', async function() {
+            const apiKey = document.getElementById('editAPIKey').value;
+            const newName = document.getElementById('editAPIName').value.trim();
+            const newProvider = document.getElementById('editAPIProvider').value;
+            const newBaseUrl = document.getElementById('editAPIBaseUrl').value.trim();
+            const newApiKey = document.getElementById('editAPIApiKey').value.trim();
+
+            // 验证输入
+            if (!newName || !newBaseUrl || !newApiKey) {
+                showToast('请填写所有必填字段', 'error');
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>保存中...';
+
+            try {
+                // 检查是否是分组编辑还是API编辑
+                const isGroupEdit = apiKey.includes('|'); // 分组编辑的apiKey格式为 "base_url|provider"
+
+                let modelsToUpdate = [];
+
+                if (isGroupEdit) {
+                    // 分组编辑：获取该分组的所有模型
+                    const modelGroups = groupModelsByName();
+                    const groupData = modelGroups[newName];
+                    if (groupData) {
+                        modelsToUpdate = groupData.models;
+                    }
+                } else {
+                    // API编辑：获取该API的所有模型
+                    const apiGroups = groupModelsByAPI();
+                    const currentApiData = apiGroups[apiKey];
+                    if (currentApiData) {
+                        modelsToUpdate = currentApiData.models;
+                    }
+                }
+
+                if (modelsToUpdate.length === 0) {
+                    throw new Error('找不到要编辑的模型');
+                }
+
+                let updatedCount = 0;
+                let failedCount = 0;
+
+                // 更新所有关联模型的信息
+                for (const model of modelsToUpdate) {
+                    try {
+                        // 创建更新数据
+                        const updateData = {
+                            id: model.id,
+                            name: newName,
+                            provider: newProvider,
+                            base_url: newBaseUrl,
+                            api_key: newApiKey,
+                            model: model.model,
+                            enabled: model.enabled,
+                            last_tested: model.last_tested
+                        };
+
+                        // 发送更新请求到后端
+                        const response = await fetch('/api/ai_models/update', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(updateData)
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            // 更新全局数据
+                            modelsData[model.id] = updateData;
+                            updatedCount++;
+                        } else {
+                            console.error('更新模型失败:', result.message);
+                            failedCount++;
+                        }
+                    } catch (error) {
+                        console.error('更新模型时出错:', error);
+                        failedCount++;
+                    }
+                }
+
+                if (updatedCount > 0) {
+                    showToast(`成功更新 ${updatedCount} 个模型的API配置`, 'success');
+                }
+                if (failedCount > 0) {
+                    showToast(`${failedCount} 个模型更新失败`, 'error');
+                }
+
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editAPIModal'));
+                modal.hide();
+
+                // 刷新显示
+                setTimeout(() => {
+                    renderAPIList();
+                }, 500);
+
+            } catch (error) {
+                console.error('更新API配置时出错:', error);
+                showToast('更新API配置时出错: ' + error.message, 'error');
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '保存更改';
+            }
+        });
+        // 切换密码显示/隐藏功能
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const inputField = document.getElementById(targetId);
+                const icon = this.querySelector('i');
+                
+                // 切换密码显示/隐藏
+                if (inputField.type === 'password') {
+                    inputField.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    inputField.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
+        });
+        
+        // 防止密码和API密钥输入框的自动填充
+        document.querySelectorAll('input[type="password"]').forEach(input => {
+            // 添加autocomplete="off"属性
+            input.setAttribute('autocomplete', 'new-password');
+            
+            // 添加额外的防自动填充措施
+            input.addEventListener('focus', function() {
+                this.setAttribute('autocomplete', 'new-password');
+            });
+            
+            // 延迟后清空自动填充的值
+            setTimeout(() => {
+                if (input.id !== 'editModelApiKey') { // 编辑时密钥可能预先填充
+                    input.value = '';
+                }
+            }, 100);
+        });
+        
+        // 更好的API密钥输入框样式
+        const apiKeyInputs = document.querySelectorAll('#modelApiKey, #editModelApiKey');
+        apiKeyInputs.forEach(input => {
+            // 添加样式类
+            input.classList.add('api-key-input');
+            
+            // 提示用户复制粘贴API密钥
+            input.addEventListener('focus', function() {
+                if (!this.value) {
+                    this.placeholder = '请粘贴您的API密钥...';
+                }
+            });
+            
+            input.addEventListener('blur', function() {
+                if (!this.value) {
+                    if (this.id === 'modelApiKey') {
+                        this.placeholder = '输入API密钥';
+                    } else {
+                        this.placeholder = '输入API密钥';
+                    }
+                }
+            });
+            
+            // 监听粘贴事件，自动清除多余空格
+            input.addEventListener('paste', function() {
+                setTimeout(() => {
+                    this.value = this.value.trim();
+                }, 10);
+            });
+        });
+        
+        // 获取可用模型列表
+        function fetchAvailableModels(baseUrl, apiKey, button, containerElement) {
+            // 确保URL格式正确（去除尾部斜杠）
+            const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+            const modelsUrl = `${cleanBaseUrl}/v1/models`;
+            
+            // 禁用搜索输入框并显示加载状态
+            const searchInput = document.getElementById('model-search-input');
+            searchInput.disabled = true;
+            searchInput.placeholder = "加载中...";
+            
+            // 显示下拉列表并设置加载状态
+            const modelsDropdown = document.getElementById('models-dropdown');
+            const searchResults = document.getElementById('search-results');
+            modelsDropdown.classList.remove('d-none');
+            searchResults.innerHTML = `
+                <div class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <span class="ms-2">加载模型中...</span>
+                </div>
+            `;
+            
+            // 禁用刷新按钮并显示加载状态
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>加载中...';
+            }
+            
+            fetch(modelsUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.data && Array.isArray(data.data)) {
+                    const models = data.data.map(model => model.id).sort();
+                    
+                    // 清空搜索结果
+                    searchResults.innerHTML = '';
+                    
+                    if (models.length === 0) {
+                        searchResults.innerHTML = '<div class="text-center py-3"><span class="text-muted">没有找到可用模型</span></div>';
+                        searchInput.disabled = true;
+                    } else {
+                        // 对模型进行分类
+                        const modelGroups = {
+                            "GPT-4": [],
+                            "GPT-3.5": [],
+                            "Claude": [],
+                            "DeepSeek": [],
+                            "其他": []
+                        };
+                        
+                        // 分类模型
+                        models.forEach(modelId => {
+                            const lowerModelId = modelId.toLowerCase();
+                            if (lowerModelId.includes('gpt-4')) {
+                                modelGroups["GPT-4"].push(modelId);
+                            } else if (lowerModelId.includes('gpt-3.5') || lowerModelId.includes('gpt3.5')) {
+                                modelGroups["GPT-3.5"].push(modelId);
+                            } else if (lowerModelId.includes('claude')) {
+                                modelGroups["Claude"].push(modelId);
+                            } else if (lowerModelId.includes('deepseek')) {
+                                modelGroups["DeepSeek"].push(modelId);
+                            } else {
+                                modelGroups["其他"].push(modelId);
+                            }
+                        });
+                        
+                        // 为每个组创建选项组
+                        Object.keys(modelGroups).forEach(groupName => {
+                            if (modelGroups[groupName].length > 0) {
+                                // 添加分组标题
+                                const groupHeader = document.createElement('div');
+                                groupHeader.className = 'model-group-header';
+                                groupHeader.innerHTML = `
+                                    <div class="fw-bold text-secondary py-1 px-2 bg-light">${groupName}</div>
+                                `;
+                                searchResults.appendChild(groupHeader);
+                                
+                                // 添加全选/取消全选按钮
+                                const groupActions = document.createElement('div');
+                                groupActions.className = 'model-group-actions d-flex justify-content-end px-2 py-1';
+                                groupActions.innerHTML = `
+                                    <button type="button" class="btn btn-sm btn-link select-all-group" data-group="${groupName}">全选</button>
+                                    <button type="button" class="btn btn-sm btn-link deselect-all-group" data-group="${groupName}">取消全选</button>
+                                `;
+                                searchResults.appendChild(groupActions);
+                                
+                                // 添加该组下的所有模型
+                                modelGroups[groupName].forEach(modelId => {
+                                    const modelItem = document.createElement('div');
+                                    modelItem.className = 'model-item d-flex align-items-center py-1 px-2 border-bottom';
+                                    modelItem.dataset.group = groupName;
+                                    modelItem.innerHTML = `
+                                        <div class="form-check">
+                                            <input class="form-check-input model-checkbox" type="checkbox" value="${modelId}" id="model-${modelId.replace(/[^a-zA-Z0-9]/g, '-')}">
+                                            <label class="form-check-label" for="model-${modelId.replace(/[^a-zA-Z0-9]/g, '-')}">
+                                                ${modelId}
+                                            </label>
+                                        </div>
+                                    `;
+                                    searchResults.appendChild(modelItem);
+                                    
+                                    // 添加点击事件
+                                    const checkbox = modelItem.querySelector('.model-checkbox');
+                                    checkbox.addEventListener('change', function() {
+                                        updateSelectedModels();
+                                    });
+                                    
+                                    // 允许点击整行选中/取消选中
+                                    modelItem.addEventListener('click', function(e) {
+                                        if (e.target.tagName !== 'INPUT') {
+                                            checkbox.checked = !checkbox.checked;
+                                            updateSelectedModels();
+                                        }
+                                    });
+                                });
+                            }
+                        });
+                        
+                        // 添加全选/取消全选按钮事件
+                        document.querySelectorAll('.select-all-group').forEach(button => {
+                            button.addEventListener('click', function() {
+                                const groupName = this.dataset.group;
+                                document.querySelectorAll(`.model-item[data-group="${groupName}"] .model-checkbox`).forEach(cb => {
+                                    cb.checked = true;
+                                });
+                                updateSelectedModels();
+                            });
+                        });
+                        
+                        document.querySelectorAll('.deselect-all-group').forEach(button => {
+                            button.addEventListener('click', function() {
+                                const groupName = this.dataset.group;
+                                document.querySelectorAll(`.model-item[data-group="${groupName}"] .model-checkbox`).forEach(cb => {
+                                    cb.checked = false;
+                                });
+                                updateSelectedModels();
+                            });
+                        });
+                        
+                        // 启用搜索输入框
+                        searchInput.disabled = false;
+                        searchInput.placeholder = "输入关键词搜索模型...";
+                        
+                        // 添加搜索功能
+                        searchInput.addEventListener('input', function() {
+                            const searchTerm = this.value.toLowerCase();
+                            filterModels(searchTerm);
+                        });
+                        
+                        // 点击外部关闭下拉框
+                        document.addEventListener('click', function(e) {
+                            if (!modelsDropdown.contains(e.target) && 
+                                !document.querySelector('.model-select-container').contains(e.target) &&
+                                !button.contains(e.target)) {
+                                modelsDropdown.classList.add('d-none');
+                            }
+                        });
+                        
+                        // 点击输入框显示下拉框
+                        document.querySelector('.model-select-container').addEventListener('click', function() {
+                            modelsDropdown.classList.remove('d-none');
+                        });
+                    }
+                    
+                    showToast(`成功获取到 ${models.length} 个可用模型`, 'success');
+                } else {
+                    throw new Error('API响应格式不正确');
+                }
+            })
+            .catch(error => {
+                console.error('获取模型列表失败:', error);
+                searchResults.innerHTML = `<div class="text-center py-3"><span class="text-danger">获取模型失败: ${error.message}</span></div>`;
+                searchInput.disabled = true;
+                searchInput.placeholder = "获取模型失败";
+                showToast(`获取模型列表失败: ${error.message}`, 'error');
+            })
+            .finally(() => {
+                // 恢复按钮状态
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-sync-alt me-1"></i>刷新模型';
+                }
+            });
+        }
+        
+        // 过滤模型
+        function filterModels(searchTerm) {
+            const modelItems = document.querySelectorAll('.model-item');
+            const groupHeaders = document.querySelectorAll('.model-group-header');
+            const groupActions = document.querySelectorAll('.model-group-actions');
+            
+            // 重置组显示状态
+            const groupVisibility = {};
+            
+            // 检查每个模型项
+            modelItems.forEach(item => {
+                const label = item.querySelector('label').textContent.toLowerCase();
+                const group = item.dataset.group;
+                
+                if (!groupVisibility[group]) {
+                    groupVisibility[group] = false;
+                }
+                
+                if (searchTerm === '' || label.includes(searchTerm)) {
+                    item.style.display = '';
+                    groupVisibility[group] = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // 更新组标题和操作按钮的显示状态
+            groupHeaders.forEach(header => {
+                const groupName = header.querySelector('div').textContent;
+                header.style.display = groupVisibility[groupName] ? '' : 'none';
+            });
+            
+            groupActions.forEach(actions => {
+                const groupName = actions.querySelector('.select-all-group').dataset.group;
+                actions.style.display = groupVisibility[groupName] ? '' : 'none';
+            });
+        }
+        
+        // 更新已选择的模型标签和隐藏输入
+        function updateSelectedModels() {
+            const selectedModels = [];
+            const tagsContainer = document.getElementById('selected-models-tags');
+            
+            // 清空当前标签
+            tagsContainer.innerHTML = '';
+            
+            // 获取所有选中的复选框
+            document.querySelectorAll('.model-checkbox:checked').forEach(checkbox => {
+                const modelId = checkbox.value;
+                selectedModels.push(modelId);
+                
+                // 创建标签
+                const tag = document.createElement('div');
+                tag.className = 'badge bg-primary d-flex align-items-center';
+                tag.innerHTML = `
+                    <span class="me-1">${modelId}</span>
+                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;" data-model="${modelId}"></button>
+                `;
+                tagsContainer.appendChild(tag);
+                
+                // 添加删除按钮事件
+                tag.querySelector('.btn-close').addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const modelToRemove = this.dataset.model;
+                    document.querySelector(`.model-checkbox[value="${modelToRemove}"]`).checked = false;
+                    updateSelectedModels();
+                });
+            });
+            
+            // 更新隐藏输入的值
+            document.getElementById('modelId').value = selectedModels.join(',');
+            
+            // 更新验证状态
+            document.getElementById('modelId').dispatchEvent(new Event('change'));
+        }
+        
+        // 保存新模型到本地存储
+        document.getElementById('saveNewModel').addEventListener('click', async function() {
+            // 获取表单数据
+            const selectedModels = document.getElementById('modelId').value.split(',').filter(Boolean);
+
+            if (selectedModels.length === 0) {
+                showToast("请至少选择一个模型", 'error');
+                return;
+            }
+
+            // 基础模型数据（不包括模型ID）
+            const baseModelData = {
+                name: document.getElementById('modelName').value.trim(),
+                provider: document.getElementById('modelProvider').value,
+                base_url: document.getElementById('modelBaseUrl').value.trim(),
+                api_key: document.getElementById('modelApiKey').value.trim(),
+                enabled: true, // 默认启用
+                last_tested: null
+            };
+
+            // 验证基础字段
+            let errors = [];
+            if (!baseModelData.name) errors.push("模型名称不能为空");
+            if (!baseModelData.base_url) errors.push("基础URL不能为空");
+            if (!baseModelData.api_key) errors.push("API密钥不能为空");
+
+            if (errors.length > 0) {
+                showToast(errors.join("<br>"), 'error');
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>保存中...';
+
+            try {
+                let successCount = 0;
+                let failedCount = 0;
+
+                // 为每个选中的模型创建数据并保存到后端
+                for (const modelId of selectedModels) {
+                    const newModelData = {
+                        ...baseModelData,
+                        model: modelId
+                    };
+
+                    try {
+                        // 发送到后端保存
+                        const response = await fetch('/api/ai_models/add', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(newModelData)
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            // 添加到全局数据（使用后端返回的ID）
+                            if (result.model) {
+                                modelsData[result.model.id] = result.model;
+                            }
+                            successCount++;
+                        } else {
+                            console.error('保存模型失败:', result.message);
+                            failedCount++;
+                        }
+                    } catch (error) {
+                        console.error('保存模型时出错:', error);
+                        failedCount++;
+                    }
+                }
+
+                if (successCount > 0) {
+                    showToast(`成功添加 ${successCount} 个模型`, 'success');
+                }
+                if (failedCount > 0) {
+                    showToast(`${failedCount} 个模型添加失败`, 'error');
+                }
+
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addModelModal'));
+                modal.hide();
+
+                // 清空表单
+                document.getElementById('addModelForm').reset();
+                document.getElementById('selected-models-tags').innerHTML = '';
+                document.getElementById('modelId').value = '';
+
+                // 刷新API列表显示
+                setTimeout(() => {
+                    renderAPIList();
+                }, 500);
+
+            } catch (error) {
+                console.error('保存模型到本地时出错:', error);
+                showToast('保存模型到本地时出错: ' + error.message, 'error');
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '保存';
+            }
+        });
+        
+
+        
+        // 更新模型到本地存储
+        document.getElementById('updateModel').addEventListener('click', async function() {
+            // 获取表单数据
+            const modelId = document.getElementById('editModelId').value;
+            const apiKey = document.getElementById('editModelApiKey').value.trim();
+            const selectedModels = document.getElementById('editModelIdName').value.split(',').filter(Boolean);
+
+            if (selectedModels.length === 0) {
+                showToast("请至少选择一个模型", 'error');
+                return;
+            }
+
+            const baseModelData = {
+                name: document.getElementById('editModelName').value.trim(),
+                provider: document.getElementById('editModelProvider').value,
+                base_url: document.getElementById('editModelBaseUrl').value.trim(),
+                enabled: document.getElementById('editModelEnabled').checked,
+                last_tested: modelsData[modelId] ? modelsData[modelId].last_tested : null
+            };
+
+            // 使用表单中的API密钥（现在总是显示现有密钥）
+            baseModelData.api_key = apiKey;
+
+            // 验证基础字段
+            let errors = [];
+            if (!baseModelData.name) errors.push("模型名称不能为空");
+            if (!baseModelData.base_url) errors.push("基础URL不能为空");
+            if (!baseModelData.api_key) errors.push("API密钥不能为空");
+
+            if (errors.length > 0) {
+                showToast(errors.join("<br>"), 'error');
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>更新中...';
+
+            // 错误提示区域
+            const errorAlert = document.getElementById('edit-model-error');
+            const errorMessage = document.getElementById('edit-model-error-message');
+            errorAlert.classList.add('d-none');
+
+            try {
+                let successCount = 0;
+                let failedCount = 0;
+
+                // 处理每个选中的模型
+                for (let index = 0; index < selectedModels.length; index++) {
+                    const modelIdValue = selectedModels[index];
+                    const modelData = {
+                        ...baseModelData,
+                        model: modelIdValue
+                    };
+
+                    try {
+                        if (index === 0) {
+                            // 第一个模型更新现有记录
+                            modelData.id = modelId;
+
+                            // 发送更新请求到后端
+                            const response = await fetch('/api/ai_models/update', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(modelData)
+                            });
+
+                            const result = await response.json();
+
+                            if (result.success) {
+                                // 更新全局数据
+                                modelsData[modelId] = modelData;
+                                successCount++;
+                            } else {
+                                console.error('更新模型失败:', result.message);
+                                failedCount++;
+                            }
+                        } else {
+                            // 其余模型创建新记录
+                            // 发送添加请求到后端
+                            const response = await fetch('/api/ai_models/add', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(modelData)
+                            });
+
+                            const result = await response.json();
+
+                            if (result.success && result.model) {
+                                // 添加到全局数据（使用后端返回的ID）
+                                modelsData[result.model.id] = result.model;
+                                successCount++;
+                            } else {
+                                console.error('添加模型失败:', result.message);
+                                failedCount++;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('处理模型时出错:', error);
+                        failedCount++;
+                    }
+                }
+
+                if (successCount > 0) {
+                    showToast(`成功保存 ${successCount} 个模型`, 'success');
+                }
+                if (failedCount > 0) {
+                    showToast(`${failedCount} 个模型保存失败`, 'error');
+                }
+
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editModelModal'));
+                modal.hide();
+
+                // 刷新API列表显示
+                setTimeout(() => {
+                    renderAPIList();
+                }, 500);
+
+            } catch (error) {
+                console.error('更新模型时出错:', error);
+
+                // 显示错误提示
+                errorMessage.textContent = error.message || '更新模型时出错';
+                errorAlert.classList.remove('d-none');
+
+                showToast('更新模型时出错: ' + error.message, 'error');
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '保存更改';
+            }
+        });
+        
+        // 删除模型按钮点击事件 - 使用事件委托
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.delete-model-btn')) {
+                const btn = e.target.closest('.delete-model-btn');
+                const modelId = btn.getAttribute('data-model-id');
+                const modelName = btn.getAttribute('data-model-name');
+
+                // 设置模态框内容
+                document.getElementById('deleteModelName').textContent = modelName;
+
+                // 显示确认模态框
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                deleteModal.show();
+
+                // 确认删除按钮点击事件
+                document.getElementById('confirmDelete').onclick = function() {
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>删除中...';
+
+                    try {
+                        // 统一使用后端API删除模型
+                        fetch(`/api/ai_models/delete/${modelId}`, {
+                            method: 'POST'
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // 从全局数据中删除
+                                delete modelsData[modelId];
+
+                                showToast('模型删除成功', 'success');
+
+                                // 关闭模态框
+                                deleteModal.hide();
+
+                                // 刷新API列表显示
+                                setTimeout(() => {
+                                    renderAPIList();
+                                }, 500);
+                            } else {
+                                showToast('删除模型失败: ' + data.message, 'error');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            showToast('删除模型时出错: ' + error.message, 'error');
+                        });
+                    } catch (error) {
+                        console.error('删除模型时出错:', error);
+                        showToast('删除模型时出错: ' + error.message, 'error');
+                    } finally {
+                        this.disabled = false;
+                        this.innerHTML = '确认删除';
+                    }
+                };
+            }
+        });
+        
+        // 测试连接函数
+        function testConnection(modelId, button) {
+            const resultContainer = document.getElementById(`test-result-${modelId}`);
+            const messageElement = resultContainer.querySelector('.message');
+            const responseElement = resultContainer.querySelector('.response');
+
+            // 显示测试结果区域，并显示加载消息
+            resultContainer.classList.remove('d-none', 'success', 'error');
+            resultContainer.classList.add('loading');
+            messageElement.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>测试连接中，请稍候...';
+            responseElement.textContent = '';
+
+            // 记住这个测试结果已展开
+            pageState.expandedTestResults.add(modelId);
+            
+            // 记录开始测试的时间
+            const startTime = new Date().getTime();
+            
+            // 设置超时处理
+            const timeoutMs = 30000; // 30秒
+            let timeoutId = setTimeout(() => {
+                console.log("测试连接请求超时");
+                
+                // 计算响应时间
+                const endTime = new Date().getTime();
+                const responseTime = ((endTime - startTime) / 1000).toFixed(2);
+                
+                // 恢复按钮状态
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-plug me-2"></i>测试连接';
+                }
+                
+                // 显示超时错误
+                resultContainer.classList.remove('loading');
+                resultContainer.classList.add('error');
+                messageElement.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>测试连接超时';
+                
+                // 添加错误详情
+                responseElement.innerHTML = `<div class="test-details">
+                    <div class="test-details-item">
+                        <span class="test-details-label">错误类型</span>
+                        <span class="test-details-value">请求超时</span>
+                    </div>
+                    <div class="test-details-item">
+                        <span class="test-details-label">超时时间</span>
+                        <span class="test-details-value">${timeoutMs/1000}秒</span>
+                    </div>
+                    <div class="test-details-item">
+                        <span class="test-details-label">可能原因</span>
+                        <span class="test-details-value">服务器响应超时或API地址不正确</span>
+                    </div>
+                    <div class="test-details-item">
+                        <span class="test-details-label">响应时间</span>
+                        <span class="test-details-value">${responseTime}秒</span>
+                    </div>
+                    <div class="test-details-item">
+                        <span class="test-details-label">建议</span>
+                        <span class="test-details-value">检查API地址是否正确，确保包含正确的协议(http/https)和完整域名</span>
+                    </div>
+                </div>`;
+                
+                // 更新状态标签 - 修复选择器
+                const statusBadges = document.querySelectorAll(`[data-model-id="${modelId}"]`);
+                statusBadges.forEach(element => {
+                    // 查找同一个模型项中的状态标签
+                    const modelItem = element.closest('.model-item, .card, .model-card-small');
+                    if (modelItem) {
+                        const statusBadge = modelItem.querySelector('.badge:not(.bg-primary):not(.bg-secondary)');
+                        if (statusBadge && (statusBadge.textContent.includes('可用') || statusBadge.textContent.includes('未连接'))) {
+                            statusBadge.classList.remove('bg-success');
+                            statusBadge.classList.add('bg-danger');
+                            statusBadge.textContent = '未连接';
+                        }
+
+                        // 添加禁用样式
+                        modelItem.classList.add('disabled');
+                    }
+                });
+                
+                showToast('测试连接超时，请检查API地址和网络连接', 'error');
+            }, timeoutMs);
+            
+            // 发送测试请求 - 统一使用后端API
+            const testPromise = fetch(`/api/ai_models/test/${modelId}`)
+                .then(response => response.json());
+
+            testPromise
+            .then(data => {
+                // 清除超时定时器
+                clearTimeout(timeoutId);
+                return data;
+            })
+            .catch(error => {
+                // 清除超时定时器
+                clearTimeout(timeoutId);
+                throw error;
+            })
+            .then(data => {
+                // 计算响应时间
+                const endTime = new Date().getTime();
+                const responseTime = ((endTime - startTime) / 1000).toFixed(2);
+                
+                // 移除加载样式
+                resultContainer.classList.remove('loading');
+                
+                if (data.success) {
+                    // 成功
+                    resultContainer.classList.add('success');
+                    messageElement.innerHTML = '<i class="fas fa-check-circle me-2"></i>连接正常，模型可用';
+                    
+                    // 添加测试详情
+                    let detailsHTML = `<div class="test-details">`;
+                    
+                    // 如果有详细信息，展示模型的响应内容
+                    if (data.details) {
+                        // 显示响应类型
+                        if (data.details.response_type) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">响应类型</span>
+                                <span class="test-details-value">${data.details.response_type}</span>
+                            </div>`;
+                        }
+
+                        // 显示内容类型
+                        if (data.details.content_type) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">内容类型</span>
+                                <span class="test-details-value">${data.details.content_type}</span>
+                            </div>`;
+                        }
+
+                        // 显示模型回复
+                        if (data.details.model_response) {
+                            // 安全地处理模型回复内容，避免HTML注入和编码问题
+                            const rawResponse = data.details.model_response;
+                            const responsePreview = rawResponse.length > 200
+                                ? rawResponse.substring(0, 200) + '...'
+                                : rawResponse;
+
+                            // 创建一个临时元素来安全地转义HTML字符
+                            const tempDiv = document.createElement('div');
+                            tempDiv.textContent = responsePreview;
+                            const escapedResponse = tempDiv.innerHTML;
+
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">模型回复</span>
+                                <div class="test-details-value" style="text-align: left; overflow-x: auto; white-space: pre-wrap; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.9rem; padding: 12px; background: rgba(0,128,0,0.05); border-radius: 6px; border-left: 4px solid #28a745; line-height: 1.4;">${escapedResponse}</div>
+                            </div>`;
+                        }
+
+                        // 显示响应长度
+                        if (data.details.response_length !== undefined) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">响应长度</span>
+                                <span class="test-details-value">${data.details.response_length} 字符</span>
+                            </div>`;
+                        }
+
+                        // 显示编码信息（调试用）
+                        if (data.details.encoding) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">字符编码</span>
+                                <span class="test-details-value">${data.details.encoding}</span>
+                            </div>`;
+                        }
+
+                        // 显示内容预览（调试用）
+                        if (data.details.content_preview) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">内容调试</span>
+                                <div class="test-details-value" style="text-align: left; overflow-x: auto; white-space: pre-wrap; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.8rem; padding: 8px; background: rgba(255,193,7,0.1); border-radius: 4px; border-left: 3px solid #ffc107;">${data.details.content_preview}</div>
+                            </div>`;
+                        }
+                        
+                        // 显示使用的令牌数
+                        if (data.details.tokens_used) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">使用令牌数</span>
+                                <span class="test-details-value">${data.details.tokens_used}</span>
+                            </div>`;
+                        }
+                        
+                        // 显示响应时间
+                        if (data.details.response_time) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">API响应时间</span>
+                                <span class="test-details-value">${data.details.response_time}</span>
+                            </div>`;
+                        } else {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">总响应时间</span>
+                                <span class="test-details-value">${responseTime}秒</span>
+                            </div>`;
+                        }
+                        
+                        // 显示使用的模型
+                        if (data.details.model_used) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">目标模型</span>
+                                <span class="test-details-value">${data.details.model_used}</span>
+                            </div>`;
+                        }
+
+                        // 显示模型是否存在
+                        if (data.details.model_exists !== undefined) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">模型可用性</span>
+                                <span class="test-details-value ${data.details.model_exists ? 'text-success' : 'text-warning'}">
+                                    ${data.details.model_exists ? '✓ 模型存在' : '⚠ 模型不在列表中'}
+                                </span>
+                            </div>`;
+                        }
+
+                        // 显示可用模型列表
+                        if (data.details.available_models) {
+                            detailsHTML += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">可用模型</span>
+                                <span class="test-details-value">${data.details.available_models}</span>
+                            </div>`;
+                        }
+                    } else {
+                        // 如果没有详细信息，只显示基本信息
+                        detailsHTML += `
+                        <div class="test-details-item">
+                            <span class="test-details-label">响应时间</span>
+                            <span class="test-details-value">${responseTime}秒</span>
+                        </div>`;
+                    }
+                    
+                    // 添加测试时间
+                    detailsHTML += `
+                    <div class="test-details-item">
+                        <span class="test-details-label">测试时间</span>
+                        <span class="test-details-value">${new Date().toLocaleString()}</span>
+                    </div>`;
+                    
+                    detailsHTML += `</div>`;
+                    responseElement.innerHTML = detailsHTML;
+                    
+                    // 更新状态标签 - 修复选择器
+                    const statusBadges = document.querySelectorAll(`[data-model-id="${modelId}"]`);
+                    statusBadges.forEach(element => {
+                        // 查找同一个模型项中的状态标签
+                        const modelItem = element.closest('.model-item, .card, .model-card-small');
+                        if (modelItem) {
+                            const statusBadge = modelItem.querySelector('.badge:not(.bg-primary):not(.bg-secondary)');
+                            if (statusBadge && (statusBadge.textContent.includes('可用') || statusBadge.textContent.includes('未连接'))) {
+                                statusBadge.classList.remove('bg-danger');
+                                statusBadge.classList.add('bg-success');
+                                statusBadge.textContent = '可用';
+                            }
+
+                            // 移除禁用样式
+                            modelItem.classList.remove('disabled');
+                        }
+                    });
+                    
+                    showToast('模型连接测试成功', 'success');
+                } else {
+                    // 失败
+                    resultContainer.classList.add('error');
+                    messageElement.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>' + data.message;
+                    
+                    // 添加错误详情
+                    let errorDetails = '';
+                    if (data.error_details) {
+                        errorDetails = `<div class="test-details">`;
+                        
+                        // 错误类型
+                        if (data.error_details.type) {
+                            errorDetails += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">错误类型</span>
+                                <span class="test-details-value">${data.error_details.type || '未知'}</span>
+                            </div>`;
+                        }
+                        
+                        // 状态码
+                        if (data.error_details.status_code) {
+                            errorDetails += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">状态码</span>
+                                <span class="test-details-value">${data.error_details.status_code || 'N/A'}</span>
+                            </div>`;
+                        }
+                        
+                        // 原始响应内容 (如果是JSON解析错误或非JSON响应)
+                        if (data.error_details.raw_response) {
+                            errorDetails += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">响应内容</span>
+                                <div class="test-details-value" style="text-align: left; overflow-x: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.8rem; padding: 8px; background: rgba(0,0,0,0.03); border-radius: 4px;">${data.error_details.raw_response}</div>
+                            </div>`;
+                        }
+                        
+                        // 响应文本 (如果有)
+                        if (data.error_details.response_text) {
+                            errorDetails += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">响应内容</span>
+                                <div class="test-details-value" style="text-align: left; overflow-x: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.8rem; padding: 8px; background: rgba(0,0,0,0.03); border-radius: 4px;">${data.error_details.response_text}</div>
+                            </div>`;
+                        }
+                        
+                        // API错误消息
+                        if (data.error_details.api_error) {
+                            errorDetails += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">API错误</span>
+                                <span class="test-details-value">${data.error_details.api_error}</span>
+                            </div>`;
+                        }
+                        
+                        // API错误代码
+                        if (data.error_details.api_code) {
+                            errorDetails += `
+                            <div class="test-details-item">
+                                <span class="test-details-label">错误代码</span>
+                                <span class="test-details-value">${data.error_details.api_code}</span>
+                            </div>`;
+                        }
+                        
+                        errorDetails += `
+                        <div class="test-details-item">
+                            <span class="test-details-label">响应时间</span>
+                            <span class="test-details-value">${responseTime}秒</span>
+                        </div>
+                        <div class="test-details-item">
+                            <span class="test-details-label">测试时间</span>
+                            <span class="test-details-value">${new Date().toLocaleString()}</span>
+                        </div>
+                        </div>`;
+                    } else {
+                        errorDetails = `<div class="test-details">
+                            <div class="test-details-item">
+                                <span class="test-details-label">响应时间</span>
+                                <span class="test-details-value">${responseTime}秒</span>
+                            </div>
+                            <div class="test-details-item">
+                                <span class="test-details-label">测试时间</span>
+                                <span class="test-details-value">${new Date().toLocaleString()}</span>
+                            </div>
+                        </div>`;
+                    }
+                    
+                    responseElement.innerHTML = errorDetails;
+                    
+                    // 更新状态标签 - 修复选择器
+                    const statusBadges = document.querySelectorAll(`[data-model-id="${modelId}"]`);
+                    statusBadges.forEach(element => {
+                        // 查找同一个模型项中的状态标签
+                        const modelItem = element.closest('.model-item, .card, .model-card-small');
+                        if (modelItem) {
+                            const statusBadge = modelItem.querySelector('.badge:not(.bg-primary):not(.bg-secondary)');
+                            if (statusBadge && (statusBadge.textContent.includes('可用') || statusBadge.textContent.includes('未连接'))) {
+                                statusBadge.classList.remove('bg-success');
+                                statusBadge.classList.add('bg-danger');
+                                statusBadge.textContent = '未连接';
+                            }
+
+                            // 添加禁用样式
+                            modelItem.classList.add('disabled');
+                        }
+                    });
+                    
+                    showToast('模型连接测试失败', 'error');
+                }
+                
+                // 恢复按钮状态
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-plug me-2"></i>测试连接';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // 计算响应时间
+                const endTime = new Date().getTime();
+                const responseTime = ((endTime - startTime) / 1000).toFixed(2);
+                
+                resultContainer.classList.remove('loading');
+                resultContainer.classList.add('error');
+                messageElement.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>测试连接时出错';
+                
+                // 添加错误详情
+                responseElement.innerHTML = `<div class="test-details">
+                    <div class="test-details-item">
+                        <span class="test-details-label">错误信息</span>
+                        <span class="test-details-value">${error.message || '未知错误'}</span>
+                    </div>
+                    <div class="test-details-item">
+                        <span class="test-details-label">响应时间</span>
+                        <span class="test-details-value">${responseTime}秒</span>
+                    </div>
+                </div>`;
+                
+                showToast('测试连接时出错: ' + (error.message || '未知错误'), 'error');
+                
+                // 恢复按钮状态
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-plug me-2"></i>测试连接';
+                }
+            });
+        }
+        
+        // 显示Toast通知
+        function showToast(message, type = 'info') {
+            // 检查是否已存在Toast容器
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
+            }
+            
+            // 创建Toast元素
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center ${type === 'error' ? 'bg-danger' : type === 'success' ? 'bg-success' : 'bg-info'} text-white`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            
+            // 设置Toast内容
+            const toastBody = document.createElement('div');
+            toastBody.className = 'toast-body';
+            toastBody.innerHTML = message; // 允许HTML内容
+            
+            const flexDiv = document.createElement('div');
+            flexDiv.className = 'd-flex';
+            
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'btn-close btn-close-white me-2 m-auto';
+            closeButton.setAttribute('data-bs-dismiss', 'toast');
+            closeButton.setAttribute('aria-label', 'Close');
+            
+            flexDiv.appendChild(toastBody);
+            flexDiv.appendChild(closeButton);
+            toast.appendChild(flexDiv);
+            
+            // 添加到容器
+            toastContainer.appendChild(toast);
+            
+            // 显示Toast
+            const bsToast = new bootstrap.Toast(toast, {
+                delay: type === 'error' ? 8000 : 5000 // 错误消息显示更长时间
+            });
+            bsToast.show();
+            
+            // 添加事件监听器，在Toast隐藏后删除它
+            toast.addEventListener('hidden.bs.toast', function() {
+                toast.remove();
+            });
+        }
+        
+        // 补充刷新模型按钮的事件处理函数
+        document.getElementById('refreshModelsBtn').addEventListener('click', function() {
+            const baseUrl = document.getElementById('modelBaseUrl').value.trim();
+            const apiKey = document.getElementById('modelApiKey').value.trim();
+
+            if (!baseUrl || !apiKey) {
+                showToast('请先填写API地址和API密钥', 'error');
+                return;
+            }
+
+            // 调用统一的获取模型函数
+            fetchAvailableModels(baseUrl, apiKey, this, document.getElementById('search-results'));
+        });
+
+        // 测试连接按钮点击事件 - 使用事件委托
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.test-connection-btn')) {
+                const btn = e.target.closest('.test-connection-btn');
+                const modelId = btn.getAttribute('data-model-id');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>测试中...';
+
+                testConnection(modelId, btn);
+            }
+
+            // 折叠测试结果按钮点击事件
+            if (e.target.closest('.collapse-test-result')) {
+                const btn = e.target.closest('.collapse-test-result');
+                const modelId = btn.getAttribute('data-model-id');
+                const resultContainer = document.getElementById(`test-result-${modelId}`);
+
+                if (resultContainer) {
+                    resultContainer.classList.add('d-none');
+                    // 从展开状态中移除
+                    pageState.expandedTestResults.delete(modelId);
+                    // 保存状态
+                    savePageState();
+                }
+            }
+        });
+
+        // 编辑模式下的刷新模型按钮
+        document.getElementById('editRefreshModelsBtn').addEventListener('click', function() {
+            const baseUrl = document.getElementById('editModelBaseUrl').value.trim();
+            const apiKey = document.getElementById('editModelApiKey').value.trim();
+            const modelId = document.getElementById('editModelId').value;
+
+            // 如果API密钥为空，尝试使用原来的密钥
+            let effectiveApiKey = apiKey;
+            if (!effectiveApiKey && modelId && modelsData[modelId]) {
+                effectiveApiKey = modelsData[modelId].api_key;
+            }
+
+            if (!baseUrl || !effectiveApiKey) {
+                showToast('请先填写API地址和API密钥', 'error');
+                return;
+            }
+
+            // 调用统一的获取模型函数
+            fetchAvailableModels(baseUrl, effectiveApiKey, this, document.getElementById('edit-search-results'));
+        });
+
+        // 过滤编辑模式下的模型
+        function filterEditModels(searchTerm) {
+            const modelItems = document.querySelectorAll('#edit-search-results .model-item');
+            const groupHeaders = document.querySelectorAll('#edit-search-results .model-group-header');
+            const groupActions = document.querySelectorAll('#edit-search-results .model-group-actions');
+            
+            // 重置组显示状态
+            const groupVisibility = {};
+            
+            // 检查每个模型项
+            modelItems.forEach(item => {
+                const label = item.querySelector('label').textContent.toLowerCase();
+                const group = item.dataset.group;
+                
+                if (!groupVisibility[group]) {
+                    groupVisibility[group] = false;
+                }
+                
+                if (searchTerm === '' || label.includes(searchTerm)) {
+                    item.style.display = '';
+                    groupVisibility[group] = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // 更新组标题和操作按钮的显示状态
+            groupHeaders.forEach(header => {
+                const groupName = header.querySelector('div').textContent;
+                header.style.display = groupVisibility[groupName] ? '' : 'none';
+            });
+            
+            groupActions.forEach(actions => {
+                const groupName = actions.querySelector('.edit-select-all-group').dataset.group;
+                actions.style.display = groupVisibility[groupName] ? '' : 'none';
+            });
+        }
+
+        // 更新已选择的编辑模式模型标签和隐藏输入
+        function updateEditSelectedModels() {
+            const selectedModels = [];
+            const tagsContainer = document.getElementById('edit-selected-models-tags');
+            
+            // 清空当前标签
+            tagsContainer.innerHTML = '';
+            
+            // 获取所有选中的复选框
+            document.querySelectorAll('.edit-model-checkbox:checked').forEach(checkbox => {
+                const modelId = checkbox.value;
+                selectedModels.push(modelId);
+                
+                // 创建标签
+                const tag = document.createElement('div');
+                tag.className = 'badge bg-primary d-flex align-items-center';
+                tag.innerHTML = `
+                    <span class="me-1">${modelId}</span>
+                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.5rem;" data-model="${modelId}"></button>
+                `;
+                tagsContainer.appendChild(tag);
+                
+                // 添加删除按钮事件
+                tag.querySelector('.btn-close').addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const modelToRemove = this.dataset.model;
+                    document.querySelector(`.edit-model-checkbox[value="${modelToRemove}"]`).checked = false;
+                    updateEditSelectedModels();
+                });
+            });
+            
+            // 更新隐藏输入的值
+            document.getElementById('editModelIdName').value = selectedModels.join(',');
+        }
+    });
+</script>
+
+
+
+{% endblock %}

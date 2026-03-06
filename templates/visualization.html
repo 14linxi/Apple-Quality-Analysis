@@ -1,0 +1,3481 @@
+{% extends "base.html" %}
+
+{% block title %}数据可视化 - 苹果品质分析系统{% endblock %}
+
+{% block content %}
+<!-- 添加主容器用于动画和布局切换 -->
+<div class="visualization-container" id="visualization-container">
+  <!-- 左侧可视化区域 -->
+  <div class="visualization-charts" id="visualization-charts">
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="fas fa-chart-pie"></i> 数据可视化</h2>
+        <p class="text-muted">通过各种图表直观地分析苹果品质数据的分布、特征及相关性。</p>
+        <!-- 添加AI分析按钮 -->
+        <button type="button" class="btn btn-success float-end" id="ai-analysis-btn">
+            <i class="fas fa-robot me-2"></i>AI智能分析
+        </button>
+    </div>
+</div>
+
+
+
+<!-- 隐藏的数据容器 -->
+<div id="chart-data-container" style="display:none;" 
+     data-quality-chart='{% if quality_chart %}{{ quality_chart|tojson }}{% else %}null{% endif %}'
+     data-feature-figs='{% if feature_figs %}{{ feature_figs|tojson|safe }}{% else %}{} {% endif %}'>
+</div>
+
+{% if correlation_heatmap %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-th"></i> 特征相关性热图</h4>
+            </div>
+            <div class="card-body text-center correlation-heatmap">
+                <div class="chart-container">
+                    <div class="chart-loading" id="heatmap-loading">
+                        <div class="chart-loading-spinner"></div>
+                    </div>
+                    <img src="data:image/png;base64,{{ correlation_heatmap }}" class="img-fluid" alt="相关性热图" onload="this.parentNode.querySelector('.chart-loading').style.display='none';">
+                </div>
+                <div class="mt-3">
+                    <p class="text-muted">热图展示了不同特征之间的相关性，颜色越深表示相关性越强。正相关为红色，负相关为蓝色。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i> 无法生成相关性热图，请检查数据是否正确加载。
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if quality_chart %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-chart-pie"></i> 苹果品质分布</h4>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <div class="chart-loading" id="quality-chart-loading">
+                        <div class="chart-loading-spinner"></div>
+                    </div>
+                    <div id="quality-chart" style="height: 400px;"></div>
+                </div>
+                <div class="mt-3">
+                    <p class="text-muted">饼图展示了数据集中优质与劣质苹果的分布比例。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i> 无法生成品质分布图，请检查数据是否正确加载。
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if feature_figs %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-chart-bar"></i> 特征分布分析</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for feature, chart_json in feature_figs.items() %}
+                    <div class="col-md-6 mb-4">
+                        <div class="chart-container">
+                            <div class="chart-loading" id="feature-loading-{{ loop.index }}">
+                                <div class="chart-loading-spinner"></div>
+                            </div>
+                            <div class="feature-chart" id="feature-chart-{{ loop.index }}" style="height: 320px; margin-bottom: 20px;"></div>
+                        </div>
+                        <!-- 添加特征名称的中文映射 -->
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                // 特征名称中英文映射
+                                var featureNames = {
+                                    'acidity': '酸度',
+                                    'crunchiness': '脆度',
+                                    'juiciness': '多汁程度',
+                                    'ripeness': '成熟度',
+                                    'size': '大小',
+                                    'sweetness': '甜度',
+                                    'weight': '重量'
+                                };
+                                
+                                // 修改特征图表标题
+                                setTimeout(function() {
+                                    var chartDiv = document.getElementById('feature-chart-{{ loop.index }}');
+                                    if (chartDiv) {
+                                        var featureName = '{{ feature }}';
+                                        var chineseName = featureNames[featureName] || featureName;
+                                        
+                                        // 获取图表标题元素并修改
+                                        var titleElement = chartDiv.querySelector('.gtitle');
+                                        if (titleElement) {
+                                            // 替换英文标题为中文
+                                            var titleText = titleElement.textContent;
+                                            
+                                            // 同时替换特征名和"分布"词组
+                                            if (titleText.includes(featureName + ' 分布')) {
+                                                titleText = chineseName + '分布';
+                                            } else if (titleText.includes(featureName)) {
+                                                titleText = titleText.replace(featureName, chineseName);
+                                            }
+                                            
+                                            titleElement.textContent = titleText;
+                                            logDebug("已将图表标题'" + featureName + "'修改为'" + chineseName + "'");
+                                        }
+                                    }
+                                }, 500); // 给图表渲染一点时间
+                            });
+                        </script>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-4 pt-3" style="border-top: 1px solid #e9ecef;">
+                    <p class="text-muted mb-0" style="font-size: 14px; line-height: 1.5;">
+                        <i class="fas fa-info-circle me-2"></i>
+                        直方图展示了各个特征在不同品质类别下的分布情况。蓝色表示优质苹果，红色表示劣质苹果。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i> 无法生成特征分布图，请检查数据是否正确加载。
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 新增的结论部分 -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-lightbulb"></i> 结论：影响苹果品质的关键因素</h4>
+            </div>
+            <div class="card-body">
+                <h5 class="mb-3">判断苹果好坏的主要特征：</h5>
+                
+                <!-- 新增的相关性强度可视化图表 -->
+                <div class="mb-4">
+                    <h5>各因素与苹果品质的相关性强度：</h5>
+                    <div class="correlation-chart-container" style="height: 300px;">
+                        <div class="chart-container">
+                            <div class="chart-loading" id="correlation-chart-loading">
+                                <div class="chart-loading-spinner"></div>
+                            </div>
+                            <canvas id="correlation-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 新增雷达图比较 -->
+                <div class="mb-4">
+                    <h5>高品质与低品质苹果特征对比：</h5>
+                    <div class="radar-chart-container" style="height: 400px;">
+                        <div class="chart-container">
+                            <div class="chart-loading" id="radar-chart-loading">
+                                <div class="chart-loading-spinner"></div>
+                            </div>
+
+                            <canvas id="radar-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card bg-light mb-3">
+                            <div class="card-header text-center text-white bg-success">优质苹果特征</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        多汁程度 (Juiciness)
+                                        <span class="badge bg-success rounded-pill">中度正相关 (0.26)</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        甜度 (Sweetness)
+                                        <span class="badge bg-success rounded-pill">中度正相关 (0.25)</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        大小 (Size)
+                                        <span class="badge bg-success rounded-pill">中度正相关 (0.24)</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-light mb-3">
+                            <div class="card-header text-center text-white bg-danger">劣质苹果特征</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        成熟度过高 (Ripeness)
+                                        <span class="badge bg-danger rounded-pill">中度负相关 (-0.26)</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card bg-light mb-3">
+                            <div class="card-header text-center text-white bg-secondary">对品质影响较小的特征</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        脆度 (Crunchiness)
+                                        <span class="badge bg-secondary rounded-pill">极弱负相关 (-0.01)</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        酸度 (Acidity)
+                                        <span class="badge bg-secondary rounded-pill">极弱负相关 (-0.01)</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        重量 (Weight)
+                                        <span class="badge bg-secondary rounded-pill">几乎无关 (0.00)</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>结论分析：</h5>
+                    <p>根据数据分析结果，我们可以得出以下关于苹果品质的结论：</p>
+                    <ol>
+                        <li><strong>多汁程度</strong>是判断苹果品质最重要的因素（相关性0.26），多汁的苹果往往被评价为优质。</li>
+                        <li><strong>甜度</strong>对苹果品质有显著正面影响（相关性0.25），高甜度的苹果通常品质更好。</li>
+                        <li><strong>大小</strong>与苹果品质呈中度正相关（相关性0.24），适当的大小有利于品质。</li>
+                        <li><strong>成熟度</strong>与苹果品质呈中度负相关（相关性-0.26），过度成熟会降低苹果品质。</li>
+                        <li><strong>脆度、酸度和重量</strong>对苹果品质的影响极小，几乎可以忽略不计。</li>
+                    </ol>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>最佳苹果特征组合：</strong> 高多汁程度 + 高甜度 + 适当大小 + 适中成熟度
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card-footer bg-white text-center">
+            <a href="{{ url_for('modeling_page') }}" class="btn btn-primary">
+                <i class="fas fa-brain me-2"></i> 开始模型训练
+            </a>
+
+        </div>
+    </div>
+</div>
+            </div>
+
+  <!-- 右侧AI分析报告区域 -->
+  <div class="ai-report-section" id="ai-report-section">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <h4 class="mb-0 me-2 flex-shrink-0"><i class="fas fa-robot me-2"></i>AI分析报告</h4>
+
+          <div class="d-flex align-items-center flex-nowrap toolbar-buttons" style="min-width: 0; overflow: hidden;">
+            <!-- 模型选择下拉菜单 -->
+            <select class="form-select form-select-sm me-1 flex-shrink-1" id="model-select" style="width: auto; min-width: 100px; max-width: 150px; font-size: 0.8rem;">
+            </select>
+            
+            <!-- 刷新模型按钮 -->
+            <button class="btn btn-sm btn-icon me-1" id="refresh-models-btn" title="刷新可用模型">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+
+            <!-- 设置图标 -->
+            <a href="{{ url_for('ai_settings_page') }}" class="btn btn-sm btn-icon me-1" title="管理AI模型">
+              <i class="fas fa-cog"></i>
+            </a>
+
+            <!-- 历史报告按钮 -->
+            <button class="btn btn-light btn-sm toolbar-btn me-1" id="history-reports-btn" style="font-size: 0.8rem; padding: 0.2rem 0.4rem;" title="查看历史报告">
+              <i class="fas fa-history me-1"></i>历史
+            </button>
+
+            <!-- 生成报告按钮 -->
+            <button class="btn btn-light btn-sm toolbar-btn me-1" id="generate-report-btn" style="font-size: 0.8rem; padding: 0.2rem 0.4rem;">
+              <i class="fas fa-play me-1"></i>生成
+            </button>
+
+            <!-- 下载报告按钮 -->
+            <button type="button" class="btn btn-light btn-sm toolbar-btn me-1" id="download-report" style="font-size: 0.8rem; padding: 0.2rem 0.4rem;">
+              <i class="fas fa-download me-1"></i>下载
+            </button>
+
+            <!-- 切换模式按钮 -->
+            <button type="button" class="btn-icon btn-sm me-1" id="toggle-mode-btn" title="分屏模式">
+              <i class="fas fa-columns"></i>
+            </button>
+
+            <!-- 关闭按钮 -->
+            <button type="button" class="btn-close btn-close-white" id="close-ai-report" aria-label="关闭"></button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 报告内容区域 -->
+      <div class="card-body ai-report-content">
+        <div id="ai-loading" class="text-center py-5" style="display:none;">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <!-- <p class="mt-3">正在生成AI分析报告，请稍候...</p> -->
+        </div>
+        <div id="ai-streaming" class="text-center py-3" style="display:none;">
+            <div class="d-flex align-items-center justify-content-center">
+                <div class="spinner-grow text-primary me-2" style="width: 1rem; height: 1rem;" role="status">
+                    <span class="visually-hidden">生成中...</span>
+                </div>
+                <span class="text-muted">AI正在实时生成报告...</span>
+            </div>
+        </div>
+        <div id="ai-report" class="ai-content" style="display:none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px; line-height: 1.6; min-height: 200px; max-height: none; height: auto; padding-bottom: 5px;">
+            <!-- AI报告将在这里显示 -->
+        </div>
+        <div id="ai-error" class="alert alert-danger" style="display:none;">
+            生成AI报告时出错，请稍后再试。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 左侧历史报告区域 -->
+  <div class="history-report-section" id="history-report-section">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <h4 class="mb-0 me-2 flex-shrink-0"><i class="fas fa-history me-2"></i>历史报告</h4>
+
+          <!-- 中间的下拉选择框 -->
+          <div class="flex-grow-1 mx-3">
+            <select class="form-select" id="history-report-select" style="max-width: 300px; font-size: 0.875rem; height: auto; padding: 0.375rem 0.75rem;">
+              <option value="">选择历史报告</option>
+            </select>
+          </div>
+
+          <div class="d-flex align-items-center flex-nowrap toolbar-buttons" style="min-width: 0; overflow: hidden;">
+            <!-- 下载和删除按钮 -->
+            <button class="btn btn-light btn-sm toolbar-btn me-1" id="download-history-report-btn" style="display: none; font-size: 0.8rem; padding: 0.2rem 0.4rem;" title="下载报告">
+              <i class="fas fa-download me-1"></i>下载
+            </button>
+            <button class="btn btn-light btn-sm toolbar-btn me-1" id="delete-report-btn" style="display: none; font-size: 0.8rem; padding: 0.2rem 0.4rem;" title="删除报告">
+              <i class="fas fa-trash me-1"></i>删除
+            </button>
+
+            <!-- 清空历史按钮 -->
+            <button class="btn btn-light btn-sm toolbar-btn me-1" id="clear-history-btn" style="font-size: 0.8rem; padding: 0.2rem 0.4rem;" title="清空历史">
+              <i class="fas fa-trash-alt me-1"></i>清空
+            </button>
+
+            <!-- 关闭按钮 -->
+            <button type="button" class="btn-close btn-close-white" id="close-history-report" aria-label="关闭"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 历史报告内容区域 -->
+      <div class="card-body history-report-content">
+        <!-- 报告内容显示区域 - 全屏显示 -->
+        <div class="history-report-display">
+          <div id="history-report-content" class="text-center text-muted py-5">
+            <i class="fas fa-file-alt fa-3x mb-3"></i>
+            <p>请从上方下拉列表选择一个报告查看内容</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- 为了兼容性保留旧的模态框，但不会显示 -->
+<div class="modal fade" id="aiAnalysisModal" tabindex="-1" aria-labelledby="aiAnalysisModalLabel" aria-hidden="true" style="display: none;">
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+  /* 主容器样式 */
+  .visualization-container {
+    position: relative;
+    min-height: 70vh;
+    width: 100%;
+    overflow: hidden; /* 防止布局切换时出现滚动条闪烁 */
+  }
+
+  /* 分屏模式下使用flex布局 */
+  .split-mode.ai-report-open .visualization-container,
+  .split-mode.history-report-open .visualization-container {
+    display: flex;
+    flex-direction: row;
+  }
+
+  /* 左侧图表区域 - 默认居中显示 */
+  .visualization-charts {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    transition: width 0.3s ease, margin 0.3s ease, max-width 0.3s ease;
+    position: relative;
+  }
+
+  /* 图表内容居中 */
+  .visualization-charts .card {
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .visualization-charts .card-header {
+    background-color: #4a6fa5;
+    color: white;
+    padding: 15px 20px;
+  }
+  
+  .visualization-charts .card-header h4 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+  
+  .visualization-charts .card-body {
+    padding: 20px;
+  }
+
+  /* 热图容器样式 */
+  .correlation-heatmap {
+    text-align: center;
+    max-width: 100%;
+  }
+  
+  .correlation-heatmap img {
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    display: block;
+  }
+
+  /* 右侧AI报告区域 - 改为覆盖式布局 */
+  .ai-report-section {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 100%;
+    height: 100vh;
+    transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease;
+    opacity: 0;
+    background: rgba(255, 255, 255, 0.98);
+    z-index: 9999;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-shadow: -3px 0 10px rgba(0, 0, 0, 0.2);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 左侧历史报告区域 - 从左侧滑出 */
+  .history-report-section {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100vh;
+    transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease;
+    opacity: 0;
+    background: rgba(255, 255, 255, 0.98);
+    z-index: 9998;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-shadow: 3px 0 10px rgba(0, 0, 0, 0.2);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 分屏模式下的历史报告区域 */
+  .split-mode .history-report-section {
+    width: 50%;
+    left: -50%;
+  }
+
+  .split-mode.history-report-open .history-report-section {
+    left: 0;
+  }
+
+  /* 展开状态 */
+  .ai-report-open .ai-report-section {
+    right: 0;
+    opacity: 1;
+  }
+
+  /* 历史报告展开状态 */
+  .history-report-open .history-report-section {
+    left: 0;
+    opacity: 1;
+  }
+  
+  /* 分屏模式时图表靠左 */
+  .split-mode .visualization-charts,
+  .ai-report-open.split-mode .visualization-charts,
+  .history-report-open.split-mode .visualization-charts {
+    margin: 0 !important;
+    max-width: none !important;
+    width: 50% !important; /* 强制保持50%宽度 */
+    padding-right: 20px;
+    overflow-x: hidden; /* 防止图表溢出容器 */
+    transform: translateZ(0); /* 启用硬件加速，提升动画性能 */
+    flex: none !important; /* 防止flex布局影响 */
+    position: relative !important; /* 确保定位正确 */
+  }
+
+  /* 报告卡片样式 */
+  .ai-report-section .card,
+  .history-report-section .card {
+    height: 100%;
+    border: none;
+    box-shadow: none;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 顶部模型选择区域样式 */
+  .ai-model-selection-top {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    position: sticky;
+    top: 60px; /* 头部高度 */
+    z-index: 9;
+    padding: 15px 20px;
+  }
+  
+  .ai-model-selection-top .card {
+    margin: 0;
+    border-radius: 4px;
+    background-color: white;
+  }
+  
+  .ai-model-selection-top .card-body {
+    padding: 15px;
+  }
+
+  /* AI报告内容区域样式 */
+  .ai-report-content {
+    flex: 1;
+    overflow-y: visible;
+    overflow-x: hidden;
+    padding: 10px 20px 5px 20px;
+    word-wrap: break-word;
+    min-height: auto;
+    height: auto;
+  }
+
+  /* 历史报告内容区域样式 */
+  .history-report-content {
+    flex: 1;
+    overflow-y: visible;
+    overflow-x: hidden;
+    padding: 10px; /* 减少内边距 */
+    word-wrap: break-word;
+    min-height: auto;
+    height: auto;
+  }
+
+  /* 让卡片标题固定在顶部 */
+  .ai-report-section .card-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #198754;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0;
+  }
+
+  /* 历史报告卡片标题样式 */
+  .history-report-section .card-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #6f42c1;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0;
+  }
+  
+  /* 工具栏按钮组样式 */
+  .toolbar-buttons {
+    display: flex;
+    align-items: center;
+    height: 31px;
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow: hidden;
+  }
+  
+  /* 工具栏按钮通用样式 */
+  .toolbar-btn {
+    height: 31px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: #198754;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .toolbar-btn:hover {
+    background-color: rgba(255, 255, 255, 1);
+    border-color: rgba(255, 255, 255, 0.8);
+    color: #0f6848;
+  }
+  
+  /* 工具栏下拉菜单样式 */
+  .toolbar-select {
+    height: 31px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    width: auto;
+    max-width: 160px;
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  /* 限制模型选择下拉框的高度和宽度 */
+  #model-select {
+    max-height: 200px;
+    overflow-y: auto;
+    min-width: 120px !important;
+    max-width: 200px !important;
+    width: auto !important;
+  }
+  
+  /* 图标按钮样式 */
+  .btn-icon {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 0.875rem;
+    width: 31px;
+    height: 31px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+  }
+  
+  .btn-icon:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  /* 移动设备上的更紧凑布局 */
+  @media (max-width: 768px) {
+    .ai-report-section .card-header {
+      padding: 10px 20px;
+    }
+    
+    .ai-report-section .card-header h4 {
+      font-size: 1rem;
+      margin-right: 10px;
+    }
+    
+    .toolbar-select {
+      max-width: 120px;
+      font-size: 0.75rem;
+    }
+    
+    .toolbar-btn {
+      padding: 0.25rem 0.4rem;
+      font-size: 0.75rem;
+    }
+  }
+  
+  /* 超小屏幕适配 */
+  @media (max-width: 576px) {
+    .ai-report-section .card-header h4 {
+      font-size: 0.9rem;
+      margin-right: 5px;
+    }
+    
+    .toolbar-select {
+      max-width: 100px;
+    }
+    
+    .toolbar-buttons {
+      gap: 2px;
+      overflow: visible;
+    }
+
+    .toolbar-btn {
+      padding: 0.1rem 0.3rem;
+      font-size: 0.7rem;
+      height: 28px;
+      white-space: nowrap;
+    }
+
+    .btn-icon {
+      width: 26px;
+      height: 26px;
+      padding: 0;
+    }
+
+    /* 小屏幕下隐藏文字，只显示图标 */
+    #generate-report-btn .fas,
+    #download-report .fas {
+      margin-right: 0 !important;
+    }
+
+    #generate-report-btn::after {
+      content: "";
+    }
+
+    #download-report::after {
+      content: "";
+    }
+  }
+
+  /* 让卡片底部固定在底部 - 移除或保留用于其他用途 */
+  .ai-report-section .card-footer {
+    display: none; /* 隐藏卡片底部，因为按钮已移至顶部 */
+  }
+
+  /* 窗口尺寸模式切换按钮 */
+  .window-mode-toggle {
+    position: absolute;
+    top: 15px;
+    right: 50px;
+    z-index: 20;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  /* 添加最小化按钮样式 */
+  .minimize-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    margin-right: 10px;
+  }
+  
+  /* 添加头部按钮样式 */
+  .header-btn {
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 14px;
+    padding: 0.25rem 0.75rem;
+    margin-right: 10px;
+  }
+  
+  .header-btn:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: white;
+  }
+  
+  /* 饼图容器 */
+  #quality-chart {
+    height: 400px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  /* 特征图表容器 */
+  .feature-chart {
+    height: 320px;
+    margin-bottom: 30px;
+    overflow: hidden;
+  }
+  
+  /* 分屏模式下特征图表需要调整大小 */
+  .split-mode .feature-chart {
+    height: 280px;
+    margin-bottom: 25px;
+  }
+  
+  /* 确保特征分布图表完全可见 */
+  .split-mode .card-body .row {
+    margin-right: 0;
+    margin-left: 0;
+  }
+  
+  /* 分屏模式下调整特征分布图列宽 */
+  .split-mode .card-body .col-md-6 {
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 100%;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  /* 相关性图表和雷达图 */
+  .correlation-chart-container, 
+  .radar-chart-container {
+    max-width: 800px;
+    margin: 0 auto 30px auto;
+  }
+  
+  /* 分屏模式下的图表容器 */
+  .split-mode .correlation-chart-container,
+  .split-mode .radar-chart-container {
+    max-width: 100%;
+  }
+
+  /* 小屏幕适配 */
+  @media (min-width: 992px) {
+    .split-mode .ai-report-section {
+      width: 50%; /* 从40%增加到50%，与图表区域对等 */
+      right: -50%;
+    }
+    
+    .split-mode.ai-report-open .ai-report-section {
+      right: 0;
+    }
+  }
+  
+  /* 平板适配 */
+  @media (max-width: 991px) {
+    .split-mode .visualization-charts {
+      width: 50%;
+    }
+    
+    .ai-report-section {
+      width: 50%;
+      right: -50%;
+    }
+    
+    .split-mode.ai-report-open .ai-report-section {
+      right: 0;
+    }
+  }
+  
+  /* 移动设备适配 */
+  @media (max-width: 767px) {
+    .split-mode .visualization-charts {
+      width: 100%;
+      padding-bottom: 50vh;
+    }
+    
+    .ai-report-section {
+      width: 100%;
+      height: auto;
+      max-height: 50vh;
+    }
+    
+    .split-mode.ai-report-open .ai-report-section {
+      top: auto;
+      bottom: 0;
+      height: 50vh;
+    }
+  }
+
+  /* 图表加载指示器样式 */
+  .chart-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: rgba(255, 255, 255, 0.8);
+    z-index: 10;
+  }
+
+  .chart-loading-spinner {
+    display: inline-block;
+    width: 2rem;
+    height: 2rem;
+    border: 0.25rem solid rgba(0, 123, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #007bff;
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  /* 历史报告列表项样式 */
+  .history-report-item {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    border: none !important;
+    padding: 12px 16px;
+  }
+
+  .history-report-item:hover {
+    background-color: #f8f9fa;
+  }
+
+  .history-report-item.active {
+    background-color: #e3f2fd;
+    border-left: 4px solid #6f42c1 !important;
+  }
+
+  .history-report-meta {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 4px;
+  }
+
+  .history-report-preview {
+    font-size: 0.9rem;
+    color: #495057;
+    max-height: 2.4em;
+    overflow: hidden;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  /* 历史报告显示区域 */
+  .history-report-display {
+    overflow-y: auto;
+    max-height: calc(100vh - 150px); /* 调整高度，因为移除了选择区域 */
+    padding: 0; /* 完全移除内边距以最大化内容显示空间 */
+    height: 100%;
+  }
+
+  #history-report-content {
+    line-height: 1.6;
+    overflow: visible;
+    width: 100%;
+    max-width: none;
+    padding: 15px; /* 内容区域的内边距 */
+  }
+
+  /* 历史报告内容区域最大化宽度 */
+  .history-report-section .card-body {
+    padding: 5px; /* 减少卡片内边距 */
+  }
+
+  .history-report-section .card {
+    margin: 0; /* 移除卡片外边距 */
+  }
+
+  /* 历史报告选择区域优化 */
+  .history-report-section .mb-3 {
+    margin-bottom: 1rem !important; /* 减少底部间距 */
+  }
+
+  /* 历史报告内容显示卡片优化 */
+  .history-report-section .card .card-header {
+    padding: 8px 15px; /* 减少头部内边距 */
+  }
+
+  .history-report-section .card .card-body.history-report-display {
+    padding: 0; /* 移除内边距，让内容区域最大化 */
+  }
+
+  #history-reports-list {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
+
+
+
+  .chart-container {
+    position: relative;
+    height: 100%;
+    width: 100%;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* 模型选择模态框样式 */
+  .modal-model-item {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+  }
+
+  .modal-model-item:hover {
+    background-color: #f8f9fa;
+    border-left-color: #007bff;
+  }
+
+  .modal-model-item.active {
+    background-color: #e3f2fd;
+    border-left-color: #007bff;
+    font-weight: 500;
+  }
+
+  .modal-model-item h6 {
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .modal-model-item.active h6 {
+    color: #007bff;
+  }
+
+  .modal-model-item small {
+    color: #6c757d;
+  }
+
+  .modal-model-details-row {
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .modal-model-details-row:last-child {
+    border-bottom: none;
+  }
+
+  .modal-model-details-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+  }
+
+  .modal-model-details-value {
+    color: #333;
+    word-break: break-all;
+  }
+
+  .modal-api-key-display {
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+  }
+
+  .model-search-container {
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 1;
+  }
+  
+  .model-category {
+    padding: 8px 12px;
+    font-weight: bold;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    color: #495057;
+    font-size: 0.9rem;
+  }
+  
+  .model-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .model-item:hover {
+    background-color: #f8f9fa;
+  }
+  
+  .model-item.active {
+    background-color: #e9f5ff;
+    color: #0d6efd;
+  }
+  
+  .model-item-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: white;
+  }
+  
+  .model-item-name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .model-item-subtitle {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: #666;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  
+  .model-item-icons {
+    display: flex;
+    gap: 5px;
+  }
+  
+  .model-item-icon-badge {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    font-size: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .no-models-found {
+    padding: 20px;
+    text-align: center;
+    color: #6c757d;
+  }
+  
+  /* 提供商颜色 */
+  .provider-openai {
+    background-color: #10a37f;
+  }
+  
+  .provider-deepseek {
+    background-color: #3b82f6;
+  }
+  
+  .provider-claude {
+    background-color: #9333ea;
+  }
+  
+  .provider-other {
+    background-color: #6c757d;
+  }
+
+  /* Markdown内容样式 */
+  .markdown-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    line-height: 1.7;
+    color: #333;
+    padding: 25px !important;
+    margin-top: 0 !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .markdown-content h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #2c3e50;
+    border-bottom: 3px solid #3498db;
+    padding-bottom: 0.8rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .markdown-content h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    border-left: 4px solid #3498db;
+    padding-left: 1rem;
+    background-color: #f8f9fa;
+    padding: 0.8rem 1rem;
+    border-radius: 5px;
+  }
+
+  .markdown-content h3 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.8rem;
+    color: #34495e;
+    border-left: 3px solid #e74c3c;
+    padding-left: 0.8rem;
+  }
+
+  .markdown-content p {
+    margin-bottom: 1rem;
+    text-align: justify;
+  }
+
+  .markdown-content ul, .markdown-content ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .markdown-content li {
+    margin-bottom: 0.4rem;
+  }
+
+  .markdown-content strong {
+    font-weight: 700;
+    color: #e74c3c;
+    background-color: #fff3cd;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    border: 1px solid #ffeaa7;
+  }
+
+  .markdown-content em {
+    font-style: italic;
+    color: #6c757d;
+    background-color: #f8f9fa;
+    padding: 0.1rem 0.3rem;
+    border-radius: 2px;
+  }
+
+  .markdown-content blockquote {
+    border-left: 4px solid #3498db;
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    background-color: #f8f9fa;
+    font-style: italic;
+  }
+
+  .markdown-content code {
+    background-color: #f1f2f6;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+  }
+
+  .markdown-content pre {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 5px;
+    overflow-x: hidden;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 1rem 0;
+  }
+
+  .markdown-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    table-layout: auto;
+    word-break: break-word;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .markdown-content th, .markdown-content td {
+    border: 1px solid #e9ecef;
+    padding: 0.8rem;
+    text-align: left;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 0;
+  }
+
+  .markdown-content th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 700;
+    text-align: center;
+    font-size: 0.95rem;
+  }
+
+  .markdown-content td {
+    background-color: #fff;
+    transition: background-color 0.2s ease;
+  }
+
+  .markdown-content tr:nth-child(even) td {
+    background-color: #f8f9fa;
+  }
+
+  .markdown-content tr:hover td {
+    background-color: #e3f2fd;
+  }
+
+  /* 思考内容样式 - 简洁设计 */
+  .think-section {
+    margin: 1.5rem 0;
+    border: 1px solid #e1e5e9;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #fafbfc;
+  }
+
+  .think-header {
+    background-color: #f6f8fa;
+    color: #24292f;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid #e1e5e9;
+  }
+
+  .think-header:hover {
+    background-color: #f3f4f6;
+  }
+
+  .think-content {
+    padding: 0;
+    background-color: #fafbfc;
+  }
+
+  .think-text {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #656d76;
+    white-space: pre-wrap;
+    background-color: #fafbfc;
+    padding: 1rem;
+    margin: 0;
+    border: none;
+  }
+
+  .think-toggle {
+    transition: transform 0.2s ease;
+    font-size: 0.75rem;
+    color: #656d76;
+  }
+
+  .think-header .fa-brain {
+    color: #8b5cf6;
+    margin-right: 0.5rem;
+  }
+
+  /* 实时思考内容样式 */
+  .think-realtime {
+    margin: 1.5rem 0;
+    border: 1px solid #dbeafe;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #eff6ff;
+    animation: pulse-border 2s infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { border-color: #dbeafe; }
+    50% { border-color: #93c5fd; }
+  }
+
+  .think-header-realtime {
+    background-color: #dbeafe;
+    color: #1e40af;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #bfdbfe;
+  }
+
+  .think-content-realtime {
+    padding: 0;
+    background-color: #eff6ff;
+  }
+
+  .think-realtime .think-text {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #374151;
+    white-space: pre-wrap;
+    background-color: #eff6ff;
+    padding: 1rem;
+    margin: 0;
+    border: none;
+  }
+
+  /* 普通文字样式的思考内容 */
+  .think-text-normal {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #374151;
+    white-space: pre-wrap;
+    padding: 1rem;
+    margin: 0;
+    border: none;
+    background-color: transparent;
+  }
+
+  .fa-pulse {
+    animation: fa-pulse 2s infinite;
+  }
+
+  @keyframes fa-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* AI内容样式 - 美观配色 */
+  .ai-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    line-height: 1.8;
+    color: #2c3e50;
+    padding: 15px 20px 5px 20px !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    width: 100%;
+    box-sizing: border-box;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .ai-content h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-top: 0;
+    margin-bottom: 2rem;
+    color: #2c3e50;
+    text-align: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    padding: 1rem 0;
+    border-bottom: 3px solid #667eea;
+    position: relative;
+  }
+
+  .ai-content h1::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
+  }
+
+  .ai-content h2 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    margin-top: 2.5rem;
+    margin-bottom: 1.2rem;
+    color: #2c3e50;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ai-content h2::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+    pointer-events: none;
+  }
+
+  .ai-content h3 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: #34495e;
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    color: white;
+    padding: 0.8rem 1.2rem;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(116, 185, 255, 0.3);
+  }
+
+  .ai-content p {
+    margin-bottom: 1.2rem;
+    text-align: justify;
+    font-size: 1rem;
+    line-height: 1.8;
+    color: #34495e;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    border-left: 4px solid #74b9ff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .ai-content ul, .ai-content ol {
+    margin-bottom: 1.5rem;
+    padding-left: 0;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    padding: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .ai-content li {
+    margin-bottom: 0.8rem;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    border-radius: 6px;
+    border-left: 4px solid #00b894;
+    list-style: none;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+  }
+
+  .ai-content li:hover {
+    transform: translateX(5px);
+  }
+
+  .ai-content li::before {
+    content: '▶';
+    color: #00b894;
+    font-weight: bold;
+    position: absolute;
+    left: -0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .ai-content strong {
+    font-weight: 800;
+    background: linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%);
+    color: white;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(253, 121, 168, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .ai-content em {
+    font-style: italic;
+    background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(162, 155, 254, 0.3);
+  }
+
+  .ai-content table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 1rem 0 0.5rem 0;
+    table-layout: auto;
+    word-break: break-word;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .ai-content th, .ai-content td {
+    padding: 1rem 1.2rem;
+    text-align: left;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    border: none;
+  }
+
+  .ai-content th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 800;
+    text-align: center;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .ai-content td {
+    background: rgba(255, 255, 255, 0.95);
+    transition: all 0.3s ease;
+    border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+  }
+
+  .ai-content tr:nth-child(even) td {
+    background: rgba(116, 185, 255, 0.1);
+  }
+
+  .ai-content tr:hover td {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .ai-content tbody tr {
+    transition: transform 0.2s ease;
+  }
+
+  /* 确保AI内容的最后一个元素没有底部边距 */
+  .ai-content > *:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .ai-content table:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .ai-content p:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .ai-content ul:last-child,
+  .ai-content ol:last-child {
+    margin-bottom: 0 !important;
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<!-- 引入Marked.js用于Markdown渲染 -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    // 从数据属性获取数据
+    var dataContainer = document.getElementById('chart-data-container');
+    var qualityChartData = null;
+    var featureChartsData = {};
+    var featureCharts = [];
+
+    // 安全解析数据
+    function safeGetData() {
+        try {
+            // 获取品质图表数据
+            var qualityChartStr = dataContainer.getAttribute('data-quality-chart');
+            if (qualityChartStr && qualityChartStr !== 'null') {
+                qualityChartData = JSON.parse(qualityChartStr);
+            }
+
+            // 获取特征图表数据
+            var featureFigsStr = dataContainer.getAttribute('data-feature-figs');
+            if (featureFigsStr && featureFigsStr !== '{}') {
+                featureChartsData = JSON.parse(featureFigsStr);
+            }
+
+            return true;
+        } catch (e) {
+            console.error("数据解析错误:", e);
+            return false;
+        }
+    }
+    
+    // 调试函数（已禁用）
+    function logDebug(message) {
+        // 调试功能已禁用
+    }
+    
+    // 安全解析 JSON
+    function safeParseJSON(jsonString) {
+        if (typeof jsonString !== 'string') {
+            return jsonString; // 如果不是字符串，可能已经是对象
+        }
+        
+        try {
+            return JSON.parse(jsonString);
+        } catch (e) {
+            logDebug("JSON解析失败: " + e.message);
+            return null;
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // 加载数据
+        logDebug("初始化可视化...");
+        if (!safeGetData()) {
+            logDebug("错误: 无法获取图表数据");
+            return;
+        }
+        
+        // 处理品质分布图
+        if (qualityChartData) {
+            try {
+                var chart = echarts.init(document.getElementById('quality-chart'));
+                chart.setOption(qualityChartData);
+                
+                // 图表加载完成后隐藏加载指示器
+                chart.on('rendered', function() {
+                    document.getElementById('quality-chart-loading').style.display = 'none';
+                });
+                
+                // 窗口大小变化时重新调整图表大小
+                window.addEventListener('resize', function() {
+                    chart.resize();
+                });
+                
+                logDebug("品质分布图绘制成功");
+            } catch (e) {
+                logDebug("品质分布图绘制失败: " + e.message);
+                document.getElementById('quality-chart-loading').style.display = 'none';
+            }
+        } else {
+            logDebug("没有品质分布图数据");
+        }
+        
+        // 处理特征分布图
+        if (featureChartsData && Object.keys(featureChartsData).length > 0) {
+            var featureIndex = 0;
+            for (var feature in featureChartsData) {
+                featureIndex++;
+                try {
+                    var chartData = safeParseJSON(featureChartsData[feature]);
+                    if (!chartData) continue;
+                    
+                    var chartDiv = document.getElementById('feature-chart-' + featureIndex);
+                    if (!chartDiv) continue;
+                    
+                    var featureChart = Plotly.newPlot(chartDiv, chartData.data, chartData.layout);
+                    featureCharts.push(featureChart);
+                    
+                    // 隐藏加载指示器
+                    var loadingDiv = document.getElementById('feature-loading-' + featureIndex);
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
+                    
+                    logDebug("特征图 #" + featureIndex + " (" + feature + ") 绘制成功");
+                } catch (e) {
+                    logDebug("特征图 #" + featureIndex + " (" + feature + ") 绘制失败: " + e.message);
+                    var loadingDiv = document.getElementById('feature-loading-' + featureIndex);
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
+                }
+            }
+        } else {
+            logDebug("没有特征分布图数据");
+        }
+        
+        // 渲染相关性强度图表
+        renderCorrelationStrengthChart();
+        
+        // 渲染雷达图
+        renderRadarChart();
+
+        // AI分析交互代码
+        const aiAnalysisBtn = document.getElementById('ai-analysis-btn');
+        const closeAiReportBtn = document.getElementById('close-ai-report');
+        const visualizationContainer = document.getElementById('visualization-container');
+        const generateReportBtn = document.getElementById('generate-report-btn');
+        const toggleModeBtn = document.getElementById('toggle-mode-btn');
+        
+        // 保存当前的窗口模式（全屏/分屏）
+        let isSplitMode = true; // 默认使用分屏模式
+
+        // 响应式调整工具栏按钮
+        function adjustToolbarButtons() {
+            const toolbarWidth = document.querySelector('.toolbar-buttons').offsetWidth;
+            const generateBtn = document.getElementById('generate-report-btn');
+            const downloadBtn = document.getElementById('download-report');
+
+            if (toolbarWidth < 400) {
+                // 小屏幕：只显示图标
+                if (generateBtn) {
+                    generateBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    generateBtn.title = '生成报告';
+                }
+                if (downloadBtn) {
+                    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+                    downloadBtn.title = '下载报告';
+                }
+            } else {
+                // 大屏幕：显示图标+文字
+                if (generateBtn) {
+                    generateBtn.innerHTML = '<i class="fas fa-play me-1"></i>生成';
+                }
+                if (downloadBtn) {
+                    downloadBtn.innerHTML = '<i class="fas fa-download me-1"></i>下载';
+                }
+            }
+        }
+
+        // 窗口大小变化时调整按钮
+        window.addEventListener('resize', adjustToolbarButtons);
+        // 初始调整
+        setTimeout(adjustToolbarButtons, 100);
+        
+        // 点击AI分析按钮
+        aiAnalysisBtn.addEventListener('click', function() {
+            // 添加报告打开类
+            visualizationContainer.classList.add('ai-report-open');
+
+            // 根据当前模式决定是否添加分屏模式
+            if (isSplitMode) {
+                visualizationContainer.classList.add('split-mode');
+            }
+
+            // 隐藏加载和结果区域
+            document.getElementById('ai-loading').style.display = 'none';
+            document.getElementById('ai-report').style.display = 'none';
+            document.getElementById('ai-error').style.display = 'none';
+
+            // 适应窗口尺寸
+            adjustLayout();
+
+            // 延迟刷新图表以确保布局正确
+            setTimeout(function() {
+                refreshCharts();
+            }, 500);
+        });
+        
+        // 点击关闭按钮
+        closeAiReportBtn.addEventListener('click', function() {
+            // 首先移除报告打开状态
+            visualizationContainer.classList.remove('ai-report-open');
+
+            // 延迟移除分屏模式，让AI报告区域先完成关闭动画
+            setTimeout(function() {
+                visualizationContainer.classList.remove('split-mode');
+
+                // 再延迟刷新图表，确保布局完全稳定
+                setTimeout(function() {
+                    refreshCharts();
+                }, 100);
+            }, 200); // 等待AI报告关闭动画完成
+        });
+        
+        // 切换窗口模式按钮
+        toggleModeBtn.addEventListener('click', function() {
+            isSplitMode = !isSplitMode;
+
+            if (isSplitMode) {
+                visualizationContainer.classList.add('split-mode');
+                toggleModeBtn.innerHTML = '<i class="fas fa-expand"></i>';
+                toggleModeBtn.title = '全屏模式';
+            } else {
+                visualizationContainer.classList.remove('split-mode');
+                toggleModeBtn.innerHTML = '<i class="fas fa-columns"></i>';
+                toggleModeBtn.title = '分屏模式';
+            }
+
+            // 适应窗口尺寸
+            adjustLayout();
+
+            // 延迟刷新图表，确保CSS布局已经应用
+            setTimeout(function() {
+                refreshCharts();
+            }, 300); // 减少延迟时间，提高响应速度
+        });
+        
+        // 根据窗口大小自适应布局
+        function adjustLayout() {
+            const windowWidth = window.innerWidth;
+            
+            // 在小屏幕上强制使用全屏模式
+            if (windowWidth < 768) {
+                isSplitMode = false;
+                visualizationContainer.classList.remove('split-mode');
+                toggleModeBtn.innerHTML = '<i class="fas fa-columns"></i>';
+                toggleModeBtn.title = '分屏模式';
+                
+                // 在小屏幕上隐藏按钮文本，仅显示图标
+                if (windowWidth < 576) {
+                    document.querySelectorAll('.toolbar-btn').forEach(btn => {
+                        const icon = btn.querySelector('i');
+                        if (icon) {
+                            btn.dataset.originalHtml = btn.innerHTML;
+                            btn.innerHTML = '';
+                            btn.appendChild(icon);
+                            btn.style.width = '31px';
+                            btn.style.padding = '0';
+                            btn.style.minWidth = 'auto';
+                        }
+                    });
+                } else {
+                    // 恢复按钮文本
+                    document.querySelectorAll('.toolbar-btn').forEach(btn => {
+                        if (btn.dataset.originalHtml) {
+                            btn.innerHTML = btn.dataset.originalHtml;
+                            btn.style.width = '';
+                            btn.style.padding = '';
+                            btn.style.minWidth = '';
+                        }
+                    });
+                }
+            }
+            
+            // 调整特征图表布局
+            const featureChartsContainer = document.querySelectorAll('.feature-chart');
+            const isSplit = visualizationContainer.classList.contains('split-mode');
+
+            featureChartsContainer.forEach(function(chart) {
+                if (isSplit && windowWidth >= 768) {
+                    chart.style.height = '280px';
+                } else {
+                    chart.style.height = '320px';
+                }
+            });
+        }
+        
+        // 刷新图表以确保正确显示
+        function refreshCharts() {
+            // 使用requestAnimationFrame确保在下一帧渲染时执行
+            requestAnimationFrame(function() {
+                // 重新调整品质图表 (ECharts)
+                if (qualityChartData && document.getElementById('quality-chart')) {
+                    var qualityChart = echarts.getInstanceByDom(document.getElementById('quality-chart'));
+                    if (qualityChart) {
+                        qualityChart.resize();
+                    }
+                }
+
+                // 重新调整所有特征图表
+                if (featureCharts.length > 0) {
+                    featureCharts.forEach(function(chart) {
+                        if (document.getElementById(chart.id)) {
+                            Plotly.relayout(chart.id, {
+                                autosize: true,
+                                'xaxis.autorange': true,
+                                'yaxis.autorange': true
+                            });
+                        }
+                    });
+                }
+
+                // 如果有Canvas图表，也要调整它们
+                if (window.Chart) {
+                    const canvasCharts = Chart.instances || [];
+                    for (let i = 0; i < canvasCharts.length; i++) {
+                        if (canvasCharts[i]) {
+                            canvasCharts[i].resize();
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 监听窗口大小变化
+        window.addEventListener('resize', function() {
+            adjustLayout();
+            setTimeout(function() {
+                refreshCharts();
+            }, 100);
+        });
+        
+        // 初始调整一次布局
+        adjustLayout();
+        
+        // 模型选择相关代码
+        const modelSelect = document.getElementById('model-select');
+        const refreshModelsBtn = document.getElementById('refresh-models-btn');
+
+        // 保存当前选中的模型ID
+        let currentSelectedModelId = '';
+
+        // 模型选择下拉菜单变化事件
+        modelSelect.addEventListener('change', function() {
+            const selectedModelId = this.value;
+            if (selectedModelId && selectedModelId !== '') {
+                currentSelectedModelId = selectedModelId;
+                const selectedModel = allModels.find(m => m.id === selectedModelId);
+                if (selectedModel) {
+                    showToast(`已选择模型: ${selectedModel.model}`, 'success');
+                }
+            } else {
+                currentSelectedModelId = '';
+            }
+        });
+
+        // 刷新模型按钮点击事件
+        refreshModelsBtn.addEventListener('click', function() {
+            refreshModelsFromServer();
+        });
+        
+        // 存储所有模型数据
+        let allModels = [];
+
+        // 历史报告管理
+        const historyReports = {
+            reports: [],
+            currentReportId: null,
+
+            // 保存报告到后端
+            saveReport: function(content, modelName) {
+                return fetch('/api/save_report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        model_name: modelName || '未知模型'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 重新加载报告列表
+                        this.loadFromServer();
+                        return data.report.id;
+                    } else {
+                        throw new Error(data.message || '保存报告失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('保存报告失败:', error);
+                    showToast('保存报告失败: ' + error.message, 'error');
+                    return null;
+                });
+            },
+
+            // 从后端加载报告列表
+            loadFromServer: function() {
+                return fetch('/api/list_reports')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.reports = data.reports.map(report => ({
+                            id: report.id,
+                            modelName: report.model_name,
+                            timestamp: new Date(report.timestamp),
+                            filename: report.filename
+                        }));
+                        console.log(`已加载 ${this.reports.length} 个历史报告`);
+                    } else {
+                        throw new Error(data.message || '加载报告列表失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('加载报告列表失败:', error);
+                    this.reports = [];
+                });
+            },
+
+            // 从后端获取报告内容
+            getReport: function(reportId) {
+                return fetch(`/api/get_report/${reportId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        return {
+                            id: reportId,
+                            content: data.content,
+                            modelName: this.reports.find(r => r.id === reportId)?.modelName || '未知模型',
+                            timestamp: this.reports.find(r => r.id === reportId)?.timestamp || new Date()
+                        };
+                    } else {
+                        throw new Error(data.message || '获取报告内容失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('获取报告内容失败:', error);
+                    showToast('获取报告内容失败: ' + error.message, 'error');
+                    return null;
+                });
+            },
+
+            // 删除报告
+            deleteReport: function(reportId) {
+                return fetch(`/api/delete_report/${reportId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 重新加载报告列表
+                        this.loadFromServer();
+                        return true;
+                    } else {
+                        throw new Error(data.message || '删除报告失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('删除报告失败:', error);
+                    showToast('删除报告失败: ' + error.message, 'error');
+                    return false;
+                });
+            },
+
+            // 清空所有报告（删除所有文件）
+            clearAll: function() {
+                const deletePromises = this.reports.map(report =>
+                    fetch(`/api/delete_report/${report.id}`, { method: 'DELETE' })
+                );
+
+                return Promise.all(deletePromises)
+                .then(() => {
+                    this.reports = [];
+                    return true;
+                })
+                .catch(error => {
+                    console.error('清空报告失败:', error);
+                    showToast('清空报告失败: ' + error.message, 'error');
+                    return false;
+                });
+            }
+        };
+
+        // 从服务器刷新模型列表
+        function refreshModelsFromServer() {
+            // 显示加载状态
+            const originalIcon = refreshModelsBtn.innerHTML;
+            refreshModelsBtn.disabled = true;
+            refreshModelsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            // 保存当前选中的模型ID
+            const previousSelectedModelId = currentSelectedModelId;
+
+            // 从服务器获取最新模型列表
+            fetch('/api/ai_models/list')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success && Array.isArray(data.models)) {
+                        // 更新模型数据
+                        allModels = data.models.filter(model => model.enabled);
+
+                        // 重新加载模型选择框
+                        loadModelsInSelectFromData(allModels, previousSelectedModelId);
+
+                        showToast(`已刷新模型列表，找到 ${allModels.length} 个可用模型`, 'success');
+                    } else {
+                        throw new Error(data.message || '获取模型列表失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('刷新模型列表失败:', error);
+                    showToast(`刷新模型列表失败: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    refreshModelsBtn.disabled = false;
+                    refreshModelsBtn.innerHTML = originalIcon;
+                });
+        }
+
+        // 加载模型到下拉选择框中（从数据）
+        function loadModelsInSelectFromData(models, previousSelectedModelId = null) {
+            try {
+                // 清空下拉选择框
+                modelSelect.innerHTML = '';
+
+                if (models.length === 0) {
+                    modelSelect.innerHTML = '<option value="">没有可用模型</option>';
+                    currentSelectedModelId = '';
+                    return;
+                }
+
+                // 为每个模型创建选项
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.model;
+                    modelSelect.appendChild(option);
+                });
+
+                // 尝试恢复之前的选择
+                if (previousSelectedModelId) {
+                    const modelExists = models.find(m => m.id === previousSelectedModelId);
+                    if (modelExists) {
+                        modelSelect.value = previousSelectedModelId;
+                        currentSelectedModelId = previousSelectedModelId;
+                    } else {
+                        currentSelectedModelId = '';
+                    }
+                } else if (models.length > 0) {
+                    // 如果没有之前的选择，自动选择第一个
+                    currentSelectedModelId = models[0].id;
+                    modelSelect.value = currentSelectedModelId;
+                }
+
+                console.log(`已加载 ${models.length} 个可用模型`);
+            } catch (error) {
+                console.error('加载模型时出错:', error);
+                modelSelect.innerHTML = '<option value="">加载失败</option>';
+                currentSelectedModelId = '';
+            }
+        }
+
+        // 加载模型到下拉选择框中（从页面数据）
+        function loadModelsInSelect() {
+            try {
+                // 获取模型列表
+                var modelsStr = '{{ ai_models|tojson|default("[]")|safe }}';
+                const models = JSON.parse(modelsStr) || [];
+                allModels = models.filter(model => model.enabled); // 只保存启用的模型
+
+                // 使用统一的加载函数
+                loadModelsInSelectFromData(allModels);
+            } catch (error) {
+                console.error('加载模型时出错:', error);
+                modelSelect.innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+
+
+        // 获取提供商样式类
+        function getProviderClass(provider) {
+            switch (provider.toLowerCase()) {
+                case 'openai': return 'bg-primary';
+                case 'deepseek': return 'bg-success';
+                case 'claude': return 'bg-warning';
+                default: return 'bg-secondary';
+            }
+        }
+
+        // 获取提供商图标
+        function getProviderIcon(provider) {
+            switch (provider.toLowerCase()) {
+                case 'openai': return 'OpenAI';
+                case 'deepseek': return 'DeepSeek';
+                case 'claude': return 'Claude';
+                default: return provider.toUpperCase();
+            }
+        }
+
+        // 获取提供商显示名称
+        function getProviderDisplayName(provider) {
+            switch (provider.toLowerCase()) {
+                case 'openai': return 'OpenAI';
+                case 'deepseek': return 'DeepSeek';
+                case 'claude': return 'Claude';
+                default: return provider.toUpperCase();
+            }
+        }
+
+
+
+        // 页面加载时初始化模型选择器
+        loadModelsInSelect();
+
+        // 初始化历史报告
+        historyReports.loadFromServer();
+
+        // 简单的Toast提示函数
+        function showToast(message, type = 'info') {
+            // 创建toast元素
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} position-fixed`;
+            toast.style.cssText = `
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                min-width: 250px;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            `;
+            toast.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                ${message}
+            `;
+
+            document.body.appendChild(toast);
+
+            // 显示动画
+            setTimeout(() => {
+                toast.style.opacity = '1';
+            }, 100);
+
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // 历史报告按钮点击事件
+        document.getElementById('history-reports-btn').addEventListener('click', function() {
+            showHistoryReports();
+        });
+
+        // 历史报告下拉列表选择事件
+        document.getElementById('history-report-select').addEventListener('change', function() {
+            const reportId = this.value;
+            if (reportId) {
+                selectHistoryReport(reportId);
+            } else {
+                // 清空内容显示
+                document.getElementById('history-report-content').innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-file-alt fa-3x mb-3"></i>
+                        <p>请从上方下拉列表选择一个报告查看内容</p>
+                    </div>
+                `;
+                // 隐藏操作按钮
+                document.getElementById('download-history-report-btn').style.display = 'none';
+                document.getElementById('delete-report-btn').style.display = 'none';
+                historyReports.currentReportId = null;
+            }
+        });
+
+        // 关闭历史报告按钮点击事件
+        document.getElementById('close-history-report').addEventListener('click', function() {
+            hideHistoryReports();
+        });
+
+        // 清空历史按钮点击事件
+        document.getElementById('clear-history-btn').addEventListener('click', function() {
+            if (confirm('确定要清空所有历史报告吗？此操作不可恢复。')) {
+                historyReports.clearAll().then(success => {
+                    if (success) {
+                        renderHistoryReportsList();
+
+                        // 清空内容显示
+                        document.getElementById('history-report-content').innerHTML = `
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-file-alt fa-3x mb-3"></i>
+                                <p>请从上方下拉列表选择一个报告查看内容</p>
+                            </div>
+                        `;
+
+                        // 隐藏操作按钮
+                        document.getElementById('download-history-report-btn').style.display = 'none';
+                        document.getElementById('delete-report-btn').style.display = 'none';
+
+                        showToast('所有历史报告已清空', 'info');
+                    }
+                });
+            }
+        });
+
+        // 下载历史报告
+        document.getElementById('download-history-report-btn').addEventListener('click', function() {
+            const reportId = historyReports.currentReportId;
+            if (reportId) {
+                const report = historyReports.getReport(reportId);
+                if (report) {
+                    // 创建一个完整的文档
+                    const timeStr = report.timestamp.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    const documentContent = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="UTF-8">
+                            <title>苹果品质AI分析报告 - ${report.modelName}</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; margin: 20px; }
+                                h1, h2, h3 { color: #4a6fa5; }
+                                .report-container { max-width: 900px; margin: 0 auto; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="report-container">
+                                <h1>苹果品质AI分析报告</h1>
+                                <p>生成时间: ${timeStr}</p>
+                                <p>AI模型: ${report.modelName}</p>
+                                <hr>
+                                ${report.content}
+                            </div>
+                        </body>
+                        </html>
+                    `;
+
+                    // 创建Blob对象
+                    const blob = new Blob([documentContent], { type: 'text/html' });
+
+                    // 创建下载链接
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `苹果品质AI分析报告_${report.modelName}_${timeStr.replace(/[/:]/g, '-')}.html`;
+
+                    // 模拟点击下载
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    showToast('报告下载成功', 'success');
+                }
+            }
+        });
+
+        // 删除历史报告
+        document.getElementById('delete-report-btn').addEventListener('click', function() {
+            const reportId = historyReports.currentReportId;
+            if (reportId && confirm('确定要删除这个历史报告吗？')) {
+                historyReports.deleteReport(reportId).then(success => {
+                    if (success) {
+                        renderHistoryReportsList();
+
+                        // 清空内容显示
+                        document.getElementById('history-report-content').innerHTML = `
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-file-alt fa-3x mb-3"></i>
+                                <p>请从上方下拉列表选择一个报告查看内容</p>
+                            </div>
+                        `;
+
+                        // 隐藏操作按钮
+                        document.getElementById('download-history-report-btn').style.display = 'none';
+                        document.getElementById('delete-report-btn').style.display = 'none';
+
+                        // 重置下拉选择框
+                        document.getElementById('history-report-select').value = '';
+                        historyReports.currentReportId = null;
+
+                        showToast('历史报告已删除', 'info');
+                    }
+                });
+            }
+        });
+
+        // 显示历史报告
+        function showHistoryReports() {
+            // 如果是分屏模式，确保图表区域正确调整
+            if (visualizationContainer.classList.contains('split-mode')) {
+                visualizationContainer.classList.add('history-report-open');
+                // 延迟刷新图表以确保布局正确
+                setTimeout(function() {
+                    refreshCharts();
+                }, 300);
+            } else {
+                visualizationContainer.classList.add('history-report-open');
+            }
+            renderHistoryReportsList();
+        }
+
+        // 隐藏历史报告
+        function hideHistoryReports() {
+            visualizationContainer.classList.remove('history-report-open');
+            // 如果是分屏模式，刷新图表以恢复布局
+            if (visualizationContainer.classList.contains('split-mode')) {
+                setTimeout(function() {
+                    refreshCharts();
+                }, 300);
+            }
+        }
+
+        // 显示AI报告
+        function showAIReport() {
+            visualizationContainer.classList.add('ai-report-open');
+        }
+
+        // 渲染历史报告列表
+        function renderHistoryReportsList() {
+            const selectContainer = document.getElementById('history-report-select');
+
+            // 清空下拉列表
+            selectContainer.innerHTML = '<option value="">选择历史报告</option>';
+
+            if (historyReports.reports.length === 0) {
+                // 更新内容显示区域
+                document.getElementById('history-report-content').innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-file-alt fa-3x mb-3"></i>
+                        <p>暂无历史报告</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 填充下拉列表
+            historyReports.reports.forEach(report => {
+                const timeStr = report.timestamp.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const option = document.createElement('option');
+                option.value = report.id;
+                option.textContent = `${report.modelName} - ${timeStr}`;
+                selectContainer.appendChild(option);
+            });
+        }
+
+        // 选择历史报告
+        function selectHistoryReport(reportId) {
+            // 更新下拉列表选中状态
+            document.getElementById('history-report-select').value = reportId;
+
+            // 从后端获取报告内容
+            historyReports.getReport(reportId).then(report => {
+                if (report) {
+                    document.getElementById('history-report-content').innerHTML = report.content;
+
+                    // 显示操作按钮
+                    document.getElementById('download-history-report-btn').style.display = 'inline-block';
+                    document.getElementById('delete-report-btn').style.display = 'inline-block';
+
+                    // 设置当前选中的报告ID
+                    historyReports.currentReportId = reportId;
+                }
+            });
+        }
+
+        // 生成报告按钮点击事件
+        generateReportBtn.addEventListener('click', function() {
+            // 显示加载状态，隐藏其他区域
+            document.getElementById('ai-loading').style.display = 'block';
+            document.getElementById('ai-report').style.display = 'none';
+            document.getElementById('ai-error').style.display = 'none';
+
+            // 获取选择的模型ID
+            const modelId = currentSelectedModelId;
+
+            // 准备发送给AI的数据
+            const visualizationData = prepareDataForAI();
+
+            // 构建请求数据
+            const requestData = {
+                visualization_data: visualizationData
+            };
+
+            // 如果选择了特定模型，添加模型ID
+            if (modelId) {
+                requestData.model_id = modelId;
+            }
+
+            // 使用流式输出
+            generateAIReportStream(requestData);
+        });
+
+        // 流式生成AI报告的函数
+        function generateAIReportStream(requestData) {
+            // 先发送POST请求获取流式响应
+            fetch('/generate_ai_report_stream', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('网络响应不正常');
+                }
+
+                // 隐藏加载状态，显示流式状态和报告区域
+                document.getElementById('ai-loading').style.display = 'none';
+                document.getElementById('ai-streaming').style.display = 'block';
+                const aiReport = document.getElementById('ai-report');
+                aiReport.innerHTML = ''; // 清空之前的内容
+                aiReport.dataset.aiContent = ''; // 清空AI内容缓存
+                aiReport.style.display = 'block';
+
+                // 创建EventSource来接收流式数据
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function readStream() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) {
+                            // 流结束，隐藏流式状态指示器，刷新图表
+                            document.getElementById('ai-streaming').style.display = 'none';
+                            setTimeout(function() {
+                                refreshCharts();
+                            }, 100);
+                            return;
+                        }
+
+                        // 解码数据
+                        const chunk = decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\n');
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+
+                                    if (data.type === 'start') {
+                                        // 开始生成，可以显示状态信息
+                                        console.log('开始生成AI报告...');
+                                    } else if (data.type === 'content') {
+                                        // 追加内容到报告区域
+                                        const currentContent = aiReport.dataset.aiContent || '';
+                                        const newContent = currentContent + data.content;
+                                        aiReport.dataset.aiContent = newContent;
+
+                                        // 处理思考内容的实时显示
+                                        processThinkContent(aiReport, newContent);
+
+                                        // 不自动滚动，让用户能看到更多内容
+                                        // aiReport.scrollTop = aiReport.scrollHeight;
+                                    } else if (data.type === 'end') {
+                                        // 生成完成
+                                        console.log('AI报告生成完成');
+
+                                        // 保存报告到历史记录
+                                        const reportContent = aiReport.innerHTML;
+                                        if (reportContent && reportContent.trim()) {
+                                            const selectedModel = allModels.find(m => m.id === currentSelectedModelId);
+                                            const modelName = selectedModel ? selectedModel.model : '未知模型';
+                                            historyReports.saveReport(reportContent, modelName).then(reportId => {
+                                                if (reportId) {
+                                                    console.log('报告已保存到历史记录，ID:', reportId);
+                                                    showToast('报告已保存到历史记录', 'success');
+                                                }
+                                            });
+                                        }
+                                    } else if (data.type === 'error') {
+                                        // 显示错误，隐藏流式状态指示器
+                                        document.getElementById('ai-streaming').style.display = 'none';
+                                        document.getElementById('ai-error').style.display = 'block';
+                                        document.getElementById('ai-error').textContent = data.error || '生成AI报告时出错';
+                                        aiReport.style.display = 'none';
+                                        return;
+                                    }
+                                } catch (e) {
+                                    console.error('解析流式数据出错:', e);
+                                }
+                            }
+                        }
+
+                        // 继续读取下一个chunk
+                        return readStream();
+                    });
+                }
+
+                return readStream();
+            })
+            .catch(error => {
+                console.error('获取AI报告出错:', error);
+                document.getElementById('ai-loading').style.display = 'none';
+                document.getElementById('ai-streaming').style.display = 'none';
+                document.getElementById('ai-error').style.display = 'block';
+                document.getElementById('ai-error').textContent = '连接AI服务失败，请稍后再试';
+            });
+        }
+        
+        // 下载报告按钮点击事件
+        document.getElementById('download-report').addEventListener('click', function() {
+            const reportContent = document.getElementById('ai-report').innerHTML;
+            if (!reportContent) return;
+            
+            // 创建一个完整的文档
+            const documentContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>苹果品质AI分析报告</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        h1, h2, h3 { color: #4a6fa5; }
+                        .report-container { max-width: 900px; margin: 0 auto; }
+                    </style>
+                </head>
+                <body>
+                    <div class="report-container">
+                        <h1>苹果品质AI分析报告</h1>
+                        <p>生成时间: ${new Date().toLocaleString()}</p>
+                        <hr>
+                        ${reportContent}
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            // 创建Blob对象
+            const blob = new Blob([documentContent], { type: 'text/html' });
+            
+            // 创建下载链接
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = '苹果品质AI分析报告.html';
+            
+            // 模拟点击下载
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    });
+
+    // 处理思考内容的实时显示和折叠函数
+    function processThinkContent(container, fullContent) {
+        // 检查是否包含思考标签
+        const thinkStartIndex = fullContent.indexOf('<think>');
+        const thinkEndIndex = fullContent.indexOf('</think>');
+
+        // 记录之前的内容状态，用于判断是否需要刷新图表
+        const previousContent = container.innerHTML;
+        let contentChanged = false;
+
+        if (thinkStartIndex !== -1) {
+            const beforeThink = fullContent.substring(0, thinkStartIndex);
+
+            if (thinkEndIndex !== -1 && thinkEndIndex > thinkStartIndex) {
+                // 思考内容完整，创建折叠版本
+                const thinkContent = fullContent.substring(thinkStartIndex + 7, thinkEndIndex);
+                const afterThink = fullContent.substring(thinkEndIndex + 8);
+
+                const collapsibleThink = `
+                    <div class="think-section">
+                        <div class="think-header" onclick="toggleThinkContent(this)">
+                            <span><i class="fas fa-brain"></i> 思考过程</span>
+                            <i class="fas fa-chevron-down think-toggle"></i>
+                        </div>
+                        <div class="think-content" style="display: none;">
+                            <div class="think-text-normal">${thinkContent}</div>
+                        </div>
+                    </div>
+                `;
+
+                const newContent = beforeThink + collapsibleThink + afterThink;
+                // 显示：思考前的内容 + 折叠的思考区域 + 思考后的内容
+                container.innerHTML = newContent;
+
+                // 检查是否从实时思考状态变为折叠状态
+                if (previousContent.includes('think-realtime') && !newContent.includes('think-realtime')) {
+                    contentChanged = true;
+                }
+            } else {
+                // 思考内容正在生成，实时显示
+                const thinkContent = fullContent.substring(thinkStartIndex + 7);
+
+                const realTimeThink = `
+                    <div class="think-section think-realtime">
+                        <div class="think-header-realtime">
+                            <span><i class="fas fa-brain fa-pulse"></i> 正在思考...</span>
+                        </div>
+                        <div class="think-content-realtime">
+                            <div class="think-text-normal">${thinkContent}</div>
+                        </div>
+                    </div>
+                `;
+
+                // 显示：思考前的内容 + 实时思考区域
+                container.innerHTML = beforeThink + realTimeThink;
+            }
+        } else {
+            // 没有思考内容，直接显示
+            container.innerHTML = fullContent;
+        }
+
+        // 如果内容状态发生了重要变化，延迟刷新图表
+        // 但在分屏模式下避免刷新以保持图表布局稳定
+        if (contentChanged &&
+            !visualizationContainer.classList.contains('ai-report-open') &&
+            !visualizationContainer.classList.contains('split-mode')) {
+            setTimeout(function() {
+                refreshCharts();
+            }, 200);
+        }
+    }
+
+    // 切换思考内容显示/隐藏
+    function toggleThinkContent(header) {
+        const content = header.nextElementSibling;
+        const toggle = header.querySelector('.think-toggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.classList.remove('fa-chevron-down');
+            toggle.classList.add('fa-chevron-up');
+        } else {
+            content.style.display = 'none';
+            toggle.classList.remove('fa-chevron-up');
+            toggle.classList.add('fa-chevron-down');
+        }
+
+        // 思考内容展开/折叠后，只在非分屏模式下刷新图表
+        // 分屏模式下图表布局应该保持稳定
+        if (!visualizationContainer.classList.contains('ai-report-open') &&
+            !visualizationContainer.classList.contains('split-mode')) {
+            setTimeout(function() {
+                refreshCharts();
+            }, 150);
+        }
+    }
+
+    // 新增：渲染相关性强度图表的函数
+    function renderCorrelationStrengthChart() {
+        try {
+            var ctx = document.getElementById('correlation-chart').getContext('2d');
+            
+            // 从后端获取真实的相关性数据
+            var backendCorrelationData = null;
+            try {
+                var correlationDataStr = '{{ correlation_data|tojson|default("null")|safe }}';
+                if (correlationDataStr && correlationDataStr !== 'null') {
+                    backendCorrelationData = JSON.parse(correlationDataStr);
+                }
+            } catch (e) {
+                console.error('解析相关性数据失败:', e);
+            }
+
+            // 检查是否有有效数据
+            if (!backendCorrelationData || !backendCorrelationData.labels || backendCorrelationData.labels.length === 0) {
+                // 如果没有数据，显示提示信息
+                ctx.fillStyle = '#666';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无相关性数据', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                document.getElementById('correlation-chart-loading').style.display = 'none';
+                return;
+            }
+
+            // 准备Chart.js需要的数据格式
+            var correlationData = {
+                labels: backendCorrelationData.labels,
+                datasets: [{
+                    label: '与苹果品质的相关性系数',
+                    data: backendCorrelationData.values,
+                    backgroundColor: backendCorrelationData.colors,
+                    borderColor: backendCorrelationData.colors.map(color => color.replace('0.6', '1')), // 边框颜色更深
+                    borderWidth: 1
+                }]
+            };
+            
+            var options = {
+                indexAxis: 'y',  // 水平条形图
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                var value = context.raw;
+                                var strength = Math.abs(value);
+                                var direction = value > 0 ? '正相关' : '负相关';
+                                var strengthText = '';
+                                
+                                if (strength >= 0.7) strengthText = '高度';
+                                else if (strength >= 0.5) strengthText = '中度';
+                                else strengthText = '弱';
+                                
+                                return `${strengthText}${direction} (${value.toFixed(2)})`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        min: -1,
+                        max: 1,
+                        grid: {
+                            color: function(context) {
+                                if (context.tick.value === 0) return 'rgba(0, 0, 0, 0.5)';
+                                return 'rgba(0, 0, 0, 0.1)';
+                            }
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                if (value === 0) return '无相关';
+                                if (value === 1) return '完全正相关';
+                                if (value === -1) return '完全负相关';
+                                return value.toFixed(1);
+                            }
+                        }
+                    }
+                }
+            };
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: correlationData,
+                options: options
+            });
+            
+            // 隐藏加载指示器
+            document.getElementById('correlation-chart-loading').style.display = 'none';
+            logDebug("相关性强度图表渲染成功");
+        } catch (e) {
+            logDebug("相关性强度图表渲染失败: " + e.message);
+            document.getElementById('correlation-chart-loading').style.display = 'none';
+            console.error(e);
+        }
+    }
+
+    // 渲染雷达图对比高品质和低品质苹果特征
+    function renderRadarChart() {
+        try {
+            const ctx = document.getElementById('radar-chart').getContext('2d');
+
+            // 从后端获取真实的雷达图数据
+            var backendRadarData = null;
+            try {
+                var radarDataStr = '{{ radar_data|tojson|default("null")|safe }}';
+                if (radarDataStr && radarDataStr !== 'null' && radarDataStr !== 'None') {
+                    backendRadarData = JSON.parse(radarDataStr);
+                }
+            } catch (e) {
+                console.error('解析雷达图数据失败:', e);
+                console.error('错误详情:', e.message);
+                console.error('原始数据:', radarDataStr);
+            }
+
+
+
+
+
+            // 检查是否有有效数据
+            if (!backendRadarData || !backendRadarData.features || backendRadarData.features.length === 0) {
+                // 如果没有数据，显示提示信息
+                console.error('雷达图数据无效，显示错误信息');
+                ctx.fillStyle = '#666';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无雷达图数据', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                document.getElementById('radar-chart-loading').style.display = 'none';
+                return;
+            }
+
+            // 使用真实数据
+            const features = backendRadarData.features;
+            const highQualityData = backendRadarData.high_quality;
+            const lowQualityData = backendRadarData.low_quality;
+            
+            const radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: features,
+                    datasets: [
+                        {
+                            label: '高品质苹果',
+                            data: highQualityData,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            pointBackgroundColor: 'rgba(75, 192, 192, 1)',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: 'rgba(75, 192, 192, 1)'
+                        },
+                        {
+                            label: '低品质苹果',
+                            data: lowQualityData,
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
+                        }
+                    ]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true
+                            },
+                            min: 0,
+                            max: 10,
+                            ticks: {
+                                stepSize: 2
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.formattedValue + ' / 10';
+                                }
+                            }
+                        }
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // 隐藏加载指示器
+            document.getElementById('radar-chart-loading').style.display = 'none';
+            logDebug("雷达图渲染成功");
+        } catch (e) {
+            logDebug("雷达图渲染失败: " + e.message);
+            document.getElementById('radar-chart-loading').style.display = 'none';
+            console.error(e);
+        }
+    }
+
+    // 准备发送给AI的数据
+    function prepareDataForAI() {
+        // 收集页面上的可视化数据
+        const data = {
+            quality_distribution: {}, // 品质分布数据
+            feature_distributions: {}, // 特征分布数据
+            correlation_data: {}, // 相关性数据
+            insights: {}, // 其他见解
+            chart_descriptions: {} // 图表的文字描述，用于不支持图片识别的模型
+        };
+        
+        // 获取品质分布数据
+        if (qualityChartData && qualityChartData.data) {
+            try {
+                // 提取饼图数据
+                const pieData = qualityChartData.data[0];
+                if (pieData && pieData.labels && pieData.values) {
+                    data.quality_distribution = {
+                        labels: pieData.labels,
+                        values: pieData.values
+                    };
+                }
+            } catch (e) {
+                console.error("提取品质分布数据出错:", e);
+            }
+        }
+        
+        // 获取特征分布数据（详细的柱形图数据）
+        if (featureChartsData && Object.keys(featureChartsData).length > 0) {
+            try {
+                // 提取特征数据
+                Object.keys(featureChartsData).forEach(feature => {
+                    const chartData = featureChartsData[feature];
+                    let parsedData = null;
+
+                    if (typeof chartData === 'string') {
+                        parsedData = safeParseJSON(chartData);
+                    } else {
+                        parsedData = chartData;
+                    }
+
+                    if (parsedData && parsedData.data) {
+                        // 提取详细的直方图数据
+                        const histogramData = parsedData.data;
+                        if (histogramData.x && histogramData.y) {
+                            data.feature_distributions[feature] = {
+                                bins: histogramData.x,  // 区间范围
+                                counts: histogramData.y, // 每个区间的数量
+                                type: histogramData.type || 'histogram',
+                                name: histogramData.name || feature,
+                                total_count: Array.isArray(histogramData.y) ?
+                                    histogramData.y.reduce((a, b) => a + b, 0) : 0
+                            };
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error("提取特征分布数据出错:", e);
+            }
+        }
+        
+        // 添加详细的相关性数据
+        try {
+            // 从后端获取真实的相关性数据
+            var correlationDataStr = '{{ correlation_data|tojson|default("null")|safe }}';
+            var backendCorrelationData = null;
+            if (correlationDataStr && correlationDataStr !== 'null') {
+                backendCorrelationData = JSON.parse(correlationDataStr);
+            }
+            if (backendCorrelationData && backendCorrelationData.labels && backendCorrelationData.values) {
+                // 基础相关性数据
+                data.correlations = {};
+                for (let i = 0; i < backendCorrelationData.labels.length; i++) {
+                    data.correlations[backendCorrelationData.labels[i]] = backendCorrelationData.values[i];
+                }
+
+                // 详细的相关性分析数据
+                data.correlation_analysis = {
+                    raw_data: backendCorrelationData,
+                    sorted_by_strength: Object.entries(data.correlations)
+                        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                        .map(([feature, value]) => ({
+                            feature: feature,
+                            correlation: value,
+                            abs_correlation: Math.abs(value),
+                            direction: value > 0 ? '正相关' : '负相关',
+                            strength: Math.abs(value) >= 0.4 ? '较强' :
+                                     Math.abs(value) >= 0.2 ? '中等' :
+                                     Math.abs(value) >= 0.1 ? '弱' : '极弱'
+                        })),
+                    strongest_positive: null,
+                    strongest_negative: null,
+                    weakest: null
+                };
+
+                // 找出最强正相关、最强负相关和最弱相关
+                const sortedCorr = data.correlation_analysis.sorted_by_strength;
+                data.correlation_analysis.strongest_positive = sortedCorr.find(item => item.correlation > 0);
+                data.correlation_analysis.strongest_negative = sortedCorr.find(item => item.correlation < 0);
+                data.correlation_analysis.weakest = sortedCorr[sortedCorr.length - 1];
+            }
+        } catch (e) {
+            console.error("获取相关性数据出错:", e);
+        }
+
+        // 添加详细的雷达图数据
+        try {
+            // 从后端获取真实的雷达图数据
+            var radarDataStr = '{{ radar_data|tojson|default("null")|safe }}';
+            var backendRadarData = null;
+            if (radarDataStr && radarDataStr !== 'null') {
+                backendRadarData = JSON.parse(radarDataStr);
+            }
+            if (backendRadarData && backendRadarData.features && backendRadarData.high_quality && backendRadarData.low_quality) {
+                data.radar_analysis = {
+                    features: backendRadarData.features,
+                    high_quality_avg: backendRadarData.high_quality,
+                    low_quality_avg: backendRadarData.low_quality,
+                    raw_data: backendRadarData
+                };
+
+                // 详细的特征差异分析
+                data.feature_differences = {};
+                data.radar_detailed_analysis = {
+                    feature_comparisons: [],
+                    significant_differences: [],
+                    minor_differences: [],
+                    advantages_summary: {
+                        high_quality_advantages: [],
+                        low_quality_advantages: []
+                    }
+                };
+
+                for (let i = 0; i < backendRadarData.features.length; i++) {
+                    const feature = backendRadarData.features[i];
+                    const highValue = backendRadarData.high_quality[i];
+                    const lowValue = backendRadarData.low_quality[i];
+                    const difference = highValue - lowValue;
+                    const absDifference = Math.abs(difference);
+
+                    const featureAnalysis = {
+                        feature: feature,
+                        high_quality: highValue,
+                        low_quality: lowValue,
+                        difference: difference,
+                        abs_difference: absDifference,
+                        advantage: difference > 0 ? '优质苹果更高' : '劣质苹果更高',
+                        significance: absDifference >= 2.0 ? '显著差异' :
+                                     absDifference >= 1.0 ? '中等差异' : '轻微差异',
+                        percentage_difference: lowValue !== 0 ? ((difference / lowValue) * 100).toFixed(1) + '%' : 'N/A'
+                    };
+
+                    data.feature_differences[feature] = featureAnalysis;
+                    data.radar_detailed_analysis.feature_comparisons.push(featureAnalysis);
+
+                    // 分类差异
+                    if (absDifference >= 1.0) {
+                        data.radar_detailed_analysis.significant_differences.push(featureAnalysis);
+                    } else {
+                        data.radar_detailed_analysis.minor_differences.push(featureAnalysis);
+                    }
+
+                    // 记录优势特征
+                    if (difference > 0) {
+                        data.radar_detailed_analysis.advantages_summary.high_quality_advantages.push(feature);
+                    } else if (difference < 0) {
+                        data.radar_detailed_analysis.advantages_summary.low_quality_advantages.push(feature);
+                    }
+                }
+
+                // 按差异大小排序
+                data.radar_detailed_analysis.feature_comparisons.sort((a, b) => b.abs_difference - a.abs_difference);
+                data.radar_detailed_analysis.significant_differences.sort((a, b) => b.abs_difference - a.abs_difference);
+            }
+        } catch (e) {
+            console.error("获取雷达图数据出错:", e);
+        }
+
+        // 生成图表的文字描述，用于不支持图片识别的AI模型
+        data.chart_descriptions = generateChartDescriptions(data);
+
+        // 数据完整性检查
+
+        // 数据完整性验证
+        const dataValidation = {
+            hasCorrelations: !!(data.correlations && Object.keys(data.correlations).length > 0),
+            hasRadarData: !!(data.radar_analysis && data.radar_analysis.features && data.radar_analysis.features.length > 0),
+            hasQualityData: !!(data.quality_distribution && data.quality_distribution.labels),
+            hasFeatureDiffs: !!(data.feature_differences && Object.keys(data.feature_differences).length > 0)
+        };
+
+        console.log("数据完整性验证:", dataValidation);
+
+        if (!dataValidation.hasCorrelations) {
+            console.warn("警告：缺少相关性数据！");
+        }
+        if (!dataValidation.hasRadarData) {
+            console.warn("警告：缺少雷达图数据！");
+        }
+        if (!dataValidation.hasQualityData) {
+            console.warn("警告：缺少品质分布数据！");
+        }
+
+        console.log("========================");
+
+        return data;
+    }
+
+    // 生成图表的文字描述，用于不支持图片识别的AI模型
+    function generateChartDescriptions(data) {
+        const descriptions = {};
+
+        // 1. 品质分布图描述
+        if (data.quality_distribution && data.quality_distribution.labels && data.quality_distribution.values) {
+            const labels = data.quality_distribution.labels;
+            const values = data.quality_distribution.values;
+            let qualityDesc = "苹果品质分布饼图显示：";
+            for (let i = 0; i < labels.length && i < values.length; i++) {
+                qualityDesc += `${labels[i]}占比${values[i].toFixed(1)}%`;
+                if (i < labels.length - 1) qualityDesc += "，";
+            }
+            qualityDesc += "。数据来源：经过标准化处理的苹果品质数据集。";
+            descriptions.quality_distribution = qualityDesc;
+        }
+
+        // 1.1 添加品质分布的详细数据
+        descriptions.quality_distribution_data = {
+            chart_type: "饼图",
+            data_source: "标准化后的苹果品质数据",
+            labels: data.quality_distribution?.labels || [],
+            values: data.quality_distribution?.values || [],
+            total_samples: data.quality_distribution?.values ?
+                data.quality_distribution.values.reduce((a, b) => a + b, 0) : 0
+        };
+
+        // 2. 相关性强度图描述
+        if (data.correlations && Object.keys(data.correlations).length > 0) {
+            let corrDesc = "特征与品质相关性强度条形图显示：";
+            const sortedCorr = Object.entries(data.correlations)
+                .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+
+            sortedCorr.forEach(([feature, value], index) => {
+                const absValue = Math.abs(value);
+                const direction = value > 0 ? "正相关" : "负相关";
+                let strength = "";
+                if (absValue >= 0.3) strength = "较强";  // 针对StandardScaler标准化数据调整阈值
+                else if (absValue >= 0.15) strength = "中等";
+                else if (absValue >= 0.05) strength = "弱";
+                else strength = "极弱";
+
+                corrDesc += `${feature}与品质呈${strength}${direction}(r=${value.toFixed(3)})`;
+                if (index < sortedCorr.length - 1) corrDesc += "，";
+            });
+            corrDesc += "。注意：相关性基于标准化数据计算，阈值已针对标准化数据调整。";
+            descriptions.correlation_strength = corrDesc;
+        }
+
+        // 2.1 添加相关性的详细数据
+        descriptions.correlation_data = {
+            chart_type: "水平条形图",
+            data_source: "标准化后的特征与品质相关性",
+            correlations: data.correlations || {},
+            note: "基于StandardScaler标准化数据，相关性阈值：较强≥0.3，中等0.15-0.3，弱0.05-0.15，极弱<0.05"
+        };
+
+        // 3. 雷达图描述
+        if (data.radar_analysis && data.radar_analysis.features) {
+            const features = data.radar_analysis.features;
+            const highQuality = data.radar_analysis.high_quality_avg;
+            const lowQuality = data.radar_analysis.low_quality_avg;
+
+            let radarDesc = "优质与劣质苹果特征对比雷达图显示：";
+            const significantDiffs = [];
+
+            for (let i = 0; i < features.length; i++) {
+                const feature = features[i];
+                const highVal = highQuality[i];
+                const lowVal = lowQuality[i];
+                const diff = highVal - lowVal;
+
+                radarDesc += `${feature}方面，优质苹果映射值${highVal.toFixed(1)}，劣质苹果映射值${lowVal.toFixed(1)}`;
+                if (Math.abs(diff) > 1.0) {  // 调整阈值
+                    const advantage = diff > 0 ? '优质苹果显著更高' : '劣质苹果显著更高';
+                    radarDesc += `，${advantage}(差异${Math.abs(diff).toFixed(1)})`;
+                    significantDiffs.push({feature, difference: diff});
+                }
+                if (i < features.length - 1) radarDesc += "；";
+            }
+            radarDesc += "。注意：数值已从标准化数据映射到0-10范围以便可视化显示。";
+            descriptions.radar_comparison = radarDesc;
+        }
+
+        // 3.1 添加雷达图的详细数据
+        descriptions.radar_data = {
+            chart_type: "雷达图",
+            data_source: "标准化数据映射到0-10范围",
+            features: data.radar_analysis?.features || [],
+            high_quality_values: data.radar_analysis?.high_quality_avg || [],
+            low_quality_values: data.radar_analysis?.low_quality_avg || [],
+            note: "原始数据已标准化，此处显示值为映射后的0-10范围值"
+        };
+
+        // 4. 特征分布图描述
+        if (data.feature_distributions && Object.keys(data.feature_distributions).length > 0) {
+            let featureDesc = "各特征分布直方图显示：";
+            const featureNames = Object.keys(data.feature_distributions);
+            featureDesc += `共分析了${featureNames.length}个特征的分布情况，包括${featureNames.join('、')}等特征的标准化后数值分布模式。`;
+            featureDesc += "每个直方图展示了该特征在整个数据集中的分布形态，有助于理解数据的分布特性。";
+            descriptions.feature_distributions = featureDesc;
+        }
+
+        // 4.1 添加特征分布的详细数据
+        descriptions.feature_distributions_data = {
+            chart_type: "直方图组合",
+            data_source: "标准化后的各特征数据",
+            features_analyzed: Object.keys(data.feature_distributions || {}),
+            note: "显示标准化后各特征的分布形态和统计特性"
+        };
+
+        // 5. 相关性热图描述（从后端获取）
+        try {
+            const heatmapExists = '{{ correlation_heatmap|length > 0 }}' === 'True';
+            if (heatmapExists) {
+                descriptions.correlation_heatmap = "相关性热图以颜色深浅显示各特征之间的相关性强度，" +
+                    "暖色调（红色）表示正相关，冷色调（蓝色）表示负相关，颜色越深表示相关性越强。" +
+                    "热图基于标准化数据计算，有助于识别特征间的相互关系。";
+
+                descriptions.heatmap_data = {
+                    chart_type: "相关性热图",
+                    data_source: "标准化特征间相关性矩阵",
+                    color_scheme: "红色=正相关，蓝色=负相关，颜色深浅=相关性强度",
+                    note: "基于标准化数据的皮尔逊相关系数"
+                };
+            }
+        } catch (e) {
+            console.log("热图信息获取失败:", e);
+        }
+
+        // 6. 数据统计信息
+        try {
+            const dataStats = '{{ data_stats|tojson|safe }}';
+            if (dataStats && dataStats !== 'null') {
+                const stats = JSON.parse(dataStats);
+                descriptions.data_statistics = {
+                    total_records: stats.total_records || 0,
+                    good_quality_count: stats.good_quality || 0,
+                    bad_quality_count: stats.bad_quality || 0,
+                    features_count: stats.features_count || 0,
+                    data_preprocessing: "已进行Z-score标准化处理"
+                };
+            }
+        } catch (e) {
+            console.log("数据统计信息获取失败:", e);
+        }
+
+        // 7. 综合描述
+        const chartCount = Object.keys(descriptions).filter(key =>
+            !key.includes('_data') && !key.includes('_statistics') && key !== 'overall_summary'
+        ).length;
+
+        descriptions.overall_summary = `数据可视化包含${chartCount}个主要图表：品质分布饼图、相关性强度条形图、` +
+            `特征对比雷达图、特征分布直方图和相关性热图，全面展示了经过标准化处理的苹果品质数据的多维度分析结果。` +
+            `所有分析均基于标准化数据，确保了不同量纲特征的可比性。`;
+
+        return descriptions;
+    }
+
+    // 显示提示消息的函数
+    function showToast(message, type = 'info') {
+        // 检查是否已存在Toast容器
+        let toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // 创建Toast元素
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center ${type === 'error' ? 'bg-danger' : type === 'success' ? 'bg-success' : type === 'warning' ? 'bg-warning' : 'bg-info'} text-white`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        // 设置Toast内容
+        const toastBody = document.createElement('div');
+        toastBody.className = 'toast-body';
+        toastBody.innerHTML = message;
+        
+        const flexDiv = document.createElement('div');
+        flexDiv.className = 'd-flex';
+        
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'btn-close btn-close-white me-2 m-auto';
+        closeButton.setAttribute('data-bs-dismiss', 'toast');
+        closeButton.setAttribute('aria-label', 'Close');
+        
+        flexDiv.appendChild(toastBody);
+        flexDiv.appendChild(closeButton);
+        toast.appendChild(flexDiv);
+        
+        // 添加到容器
+        toastContainer.appendChild(toast);
+        
+        // 显示Toast
+        const bsToast = new bootstrap.Toast(toast, {
+            delay: type === 'error' ? 8000 : 3000
+        });
+        bsToast.show();
+        
+        // 添加事件监听器，在Toast隐藏后删除它
+        toast.addEventListener('hidden.bs.toast', function() {
+            toast.remove();
+        });
+    }
+</script>
+{% endblock %} 

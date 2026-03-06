@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}Kafka实时监控 - 苹果品质分析系统{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="fas fa-broadcast-tower"></i> Kafka实时监控</h2>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-success" onclick="startKafkaProcessor()" id="startBtn">
+                    <i class="fas fa-play"></i> 启动处理器
+                </button>
+                <button type="button" class="btn btn-danger" onclick="stopKafkaProcessor()" id="stopBtn">
+                    <i class="fas fa-stop"></i> 停止处理器
+                </button>
+                <button type="button" class="btn btn-info" onclick="refreshStatus()">
+                    <i class="fas fa-sync-alt"></i> 刷新状态
+                </button>
+            </div>
+        </div>
+        <p class="text-muted">
+            <i class="fas fa-info-circle"></i> 监控Kafka实时数据处理器的运行状态和处理统计信息
+        </p>
+    </div>
+</div>
+
+<!-- 处理器状态卡片 -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-server"></i> 处理器状态</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <h6>运行状态</h6>
+                        <span class="badge fs-6" id="statusBadge">检查中...</span>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>监听主题</h6>
+                        <span id="topicName">apple_quality_changes</span>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>最后更新</h6>
+                        <span id="lastUpdate">未知</span>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>自动刷新</h6>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                            <label class="form-check-label" for="autoRefresh">开启</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 处理统计信息 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-primary" id="totalMessages">0</h3>
+                <p class="mb-0">总消息数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-success" id="insertCount">0</h3>
+                <p class="mb-0">插入操作</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-info" id="updateCount">0</h3>
+                <p class="mb-0">更新操作</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-warning" id="deleteCount">0</h3>
+                <p class="mb-0">删除操作</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 错误统计 -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-danger" id="errorCount">0</h3>
+                <p class="mb-0">处理错误</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-secondary" id="successRate">100%</h3>
+                <p class="mb-0">成功率</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 最近变化历史 -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> 最近变化历史</h5>
+            </div>
+            <div class="card-body">
+                <div id="changeHistoryContainer" style="max-height: 400px; overflow-y: auto;">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 暂无变化历史记录
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast 通知容器 -->
+<div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer">
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let autoRefreshInterval = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshStatus();
+        
+        const autoRefreshCheckbox = document.getElementById('autoRefresh');
+        autoRefreshCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+        
+        if (autoRefreshCheckbox.checked) {
+            startAutoRefresh();
+        }
+    });
+
+    function startAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+        }
+        
+        autoRefreshInterval = setInterval(() => {
+            refreshStatus();
+            refreshChangeHistory();
+        }, 5000);
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    function refreshStatus() {
+        fetch('/api/kafka/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateStatusDisplay(data.data);
+                } else {
+                    showToast('获取状态失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('获取状态失败:', error);
+                showToast('获取状态失败: ' + error.message, 'error');
+            });
+    }
+
+    function updateStatusDisplay(stats) {
+        const statusBadge = document.getElementById('statusBadge');
+        
+        const status = stats.status;
+        
+        if (status === 'running') {
+            statusBadge.className = 'badge bg-success fs-6';
+            statusBadge.textContent = '运行中';
+        } else if (status === 'stopped') {
+            statusBadge.className = 'badge bg-danger fs-6';
+            statusBadge.textContent = '已停止';
+        } else {
+            statusBadge.className = 'badge bg-secondary fs-6';
+            statusBadge.textContent = '不可用';
+        }
+        
+        const statistics = stats.statistics || {};
+        document.getElementById('totalMessages').textContent = statistics.messages_processed || 0;
+        document.getElementById('insertCount').textContent = statistics.insert_processed || 0;
+        document.getElementById('updateCount').textContent = statistics.update_processed || 0;
+        document.getElementById('deleteCount').textContent = statistics.delete_processed || 0;
+        document.getElementById('errorCount').textContent = statistics.errors || 0;
+        
+        const total = statistics.messages_processed || 0;
+        const errors = statistics.errors || 0;
+        const successRate = total > 0 ? ((total - errors) / total * 100).toFixed(1) + '%' : '100%';
+        document.getElementById('successRate').textContent = successRate;
+        
+        document.getElementById('lastUpdate').textContent = new Date(stats.timestamp).toLocaleString();
+    }
+
+    function startKafkaProcessor() {
+        fetch('/api/kafka/start', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    refreshStatus();
+                } else {
+                    showToast('启动失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('启动失败: ' + error.message, 'error');
+            });
+    }
+
+    function stopKafkaProcessor() {
+        fetch('/api/kafka/stop', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'info');
+                    refreshStatus();
+                } else {
+                    showToast('停止失败: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('停止失败: ' + error.message, 'error');
+            });
+    }
+
+    function refreshChangeHistory() {
+        fetch('/api/data/changes?limit=10')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    renderChangeHistory(data.data);
+                }
+            })
+            .catch(error => {
+                console.error('获取变化历史失败:', error);
+            });
+    }
+
+    function renderChangeHistory(changes) {
+        const container = document.getElementById('changeHistoryContainer');
+        
+        if (!changes || changes.length === 0) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> 暂无变化历史记录</div>';
+            return;
+        }
+
+        let html = '';
+        changes.forEach(change => {
+            const operationIcon = {
+                'insert': '<i class="fas fa-plus text-success"></i>',
+                'update': '<i class="fas fa-edit text-info"></i>',
+                'delete': '<i class="fas fa-trash text-danger"></i>'
+            }[change.operation] || '<i class="fas fa-question text-secondary"></i>';
+
+            const operationText = {
+                'insert': '新增',
+                'update': '更新', 
+                'delete': '删除'
+            }[change.operation] || '未知操作';
+
+            html += `
+                <div class="border-start border-3 border-primary p-2 mb-2 bg-light">
+                    <div class="d-flex justify-content-between">
+                        <strong>${operationIcon} ${operationText} 记录 ID: ${change.record_id}</strong>
+                        <small class="text-muted">${change.change_time}</small>
+                    </div>
+                    <small class="text-muted">变化ID: ${change.change_id}</small>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+
+    function showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toastId = 'toast-' + Date.now();
+
+        const bgClass = {
+            'success': 'bg-success',
+            'error': 'bg-danger',
+            'warning': 'bg-warning',
+            'info': 'bg-info'
+        }[type] || 'bg-info';
+
+        const toastHtml = `
+            <div class="toast ${bgClass} text-white" id="${toastId}" role="alert">
+                <div class="toast-body">
+                    ${message}
+                    <button type="button" class="btn-close btn-close-white float-end" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        `;
+
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+        toast.show();
+
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+    }
+</script>
+{% endblock %}
